@@ -150,7 +150,7 @@ otel_exporter_otlp_endpoint: "http://localhost:4318"
 otel_metrics_endpoint: ""
 ```
 
-Docker Compose wires `otel_exporter_otlp_endpoint` to `http://otel-collector:4318`. The collector exposes application metrics to Prometheus and sends traces to Tempo. Grafana is provisioned with Prometheus and Tempo datasources.
+Docker Compose wires `otel_exporter_otlp_endpoint` to `http://otel-collector:4318`. The collector exposes application metrics to Prometheus and sends traces to Tempo through OTLP HTTP on `http://tempo:4318`. Grafana is provisioned with Prometheus and Tempo datasources.
 
 ## HTTP API
 
