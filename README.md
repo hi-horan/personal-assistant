@@ -130,6 +130,8 @@ To inspect traces directly, open Grafana, go to `Explore`, select the `Tempo` da
 {resource.service.name="personal-assistant"}
 ```
 
+The local Grafana Tempo data source uses HTTP query APIs. Streaming search is intentionally disabled because the Compose stack exposes Tempo's HTTP endpoint to Grafana, not the Tempo gRPC streaming query endpoint.
+
 Stop services with:
 
 ```sh
