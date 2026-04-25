@@ -124,6 +124,8 @@ Local service URLs:
 
 Grafana provisions the `Personal Assistant Overview` dashboard automatically under the `Personal Assistant` folder. It includes panels for chat volume and latency, HTTP errors, RAG retrievals and latency, memory writes/searches, session events, OTel Collector trace/metric pipeline health, and recent Tempo traces.
 
+Grafana plugin preinstall and auto-update are disabled in Compose. The local observability stack only uses built-in Prometheus and Tempo data sources, so it does not need Grafana's background plugin installer.
+
 To inspect traces directly, open Grafana, go to `Explore`, select the `Tempo` data source, and run a TraceQL query such as:
 
 ```text
