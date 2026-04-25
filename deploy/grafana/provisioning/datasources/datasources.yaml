@@ -12,17 +12,19 @@ datasources:
     orgId: 1
     uid: prometheus
     type: prometheus
+    version: 2
     access: proxy
     url: http://prometheus:9090
     isDefault: true
-    editable: true
+    editable: false
   - name: Tempo
     orgId: 1
     uid: tempo
     type: tempo
+    version: 2
     access: proxy
     url: http://tempo:3200
-    editable: true
+    editable: false
     jsonData:
       httpMethod: GET
       nodeGraph:
