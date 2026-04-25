@@ -7,6 +7,10 @@ log_level: info
 model_provider: echo
 gemini_model: gemini-2.5-flash
 gemini_api_key: ""
+glm_model: glm-4.6v
+glm_api_key: ""
+glm_base_url: "https://open.bigmodel.cn/api/paas/v4"
+glm_thinking_type: ""
 
 embedding_provider: hash
 embedding_model: text-embedding-004

@@ -21,6 +21,7 @@ No UI, auth, billing, scheduler, or unrelated assistant features are included in
 - Go 1.25+.
 - PostgreSQL 15+ with pgvector.
 - A Gemini API key if `model_provider: gemini`.
+- A Z.ai / BigModel API key if `model_provider: glm`.
 
 ## Quick Start
 
@@ -34,12 +35,30 @@ The service reads configuration from YAML, runs migrations at startup, and liste
 
 Set `printconfig: true` to print the final effective configuration at startup after defaults, normalization, and derived values are applied. It defaults to `false` and prints full values without redaction.
 
+Open `http://localhost:8080/` for the built-in web client. It supports selecting a user, creating or loading sessions, sending chat messages, and inspecting the latest RAG/memory details.
+
 For local wiring without a model key, keep `model_provider: echo`. For real calls, update `config.yaml`:
 
 ```yaml
 model_provider: gemini
 gemini_api_key: "..."
 ```
+
+To use GLM-4.6V through the Z.ai / BigModel OpenAI-compatible API:
+
+```yaml
+model_provider: glm
+glm_model: glm-4.6v
+glm_api_key: "..."
+glm_base_url: "https://open.bigmodel.cn/api/paas/v4"
+glm_thinking_type: ""
+```
+
+Set `glm_thinking_type: enabled` or `disabled` only when you want to send GLM's provider-specific `thinking` option. The current HTTP API is text-only, so GLM-4.6V is called as a chat model even though the model itself supports vision inputs.
+
+The GLM provider supports both non-streaming and ADK streaming model calls. The `/v1/chat` endpoint returns one JSON response, while `/v1/chat/stream` streams chat progress as server-sent events for the built-in web client.
+
+When `log_level: debug`, GLM logs the final converted provider request body before the HTTP call and the raw provider response body before conversion. Streaming GLM calls log each raw SSE `data:` chunk. These logs use the request context, so `trace_id` and `span_id` are included when a span is active.
 
 Embeddings default to local deterministic hashing so the vector pipeline works without external calls:
 
@@ -234,7 +253,8 @@ The first version supports stdio MCP servers. Sensitive toolsets should use `req
 - `deploy/`: local observability stack configuration.
 - `internal/app`: application wiring and ADK runner setup.
 - `internal/config`: YAML config loading and validation.
-- `internal/httpapi`: JSON HTTP API.
+- `internal/httpapi`: JSON HTTP API and SSE chat endpoint.
+- `internal/httpapi/web`: embedded static web client.
 - `internal/modelx`: model provider adapters.
 - `internal/observability`: `slog` and OpenTelemetry setup.
 - `internal/rag`: RAG retrieval formatting.

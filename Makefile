@@ -34,16 +34,16 @@ fmt: ## Format Go source files.
 check: fmt tidy test ## Format, tidy, and test.
 	@echo "check passed"
 
-docker-build: ## Build the Docker image.
+docker-build:
 	docker build -t $(IMAGE) .
 
 docker-up: ## Start PostgreSQL, observability, and assistant with Docker Compose.
 	$(COMPOSE) up --build
 
-docker-down: ## Stop Docker Compose services.
+docker-down:
 	$(COMPOSE) down
 
-docker-logs: ## Follow Docker Compose logs.
+docker-logs:
 	$(COMPOSE) logs -f
 
 clean: ## Remove local build artifacts.

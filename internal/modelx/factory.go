@@ -3,6 +3,7 @@ package modelx
 import (
 	"context"
 	"fmt"
+	"log/slog"
 
 	"personal-assistant/internal/config"
 
@@ -11,7 +12,7 @@ import (
 	"google.golang.org/genai"
 )
 
-func New(ctx context.Context, cfg config.Config) (model.LLM, error) {
+func New(ctx context.Context, cfg config.Config, logger *slog.Logger) (model.LLM, error) {
 	switch cfg.ModelProvider {
 	case "echo":
 		return NewEchoModel(), nil
@@ -20,6 +21,8 @@ func New(ctx context.Context, cfg config.Config) (model.LLM, error) {
 			APIKey:  cfg.GeminiAPIKey,
 			Backend: genai.BackendGeminiAPI,
 		})
+	case "glm":
+		return NewGLMModel(cfg, logger), nil
 	default:
 		return nil, fmt.Errorf("unsupported model provider %q", cfg.ModelProvider)
 	}

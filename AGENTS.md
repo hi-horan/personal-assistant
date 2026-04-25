@@ -14,6 +14,7 @@ Project rules for coding agents working in this repository.
 - ADK-Go for agent runtime.
 - PostgreSQL for durable state.
 - pgvector for memory embeddings and vector search.
+- Model providers: `echo`, `gemini`, and `glm`.
 - Cobra for CLI commands.
 - YAML for configuration.
 - `log/slog` for logging.
@@ -45,6 +46,7 @@ Project rules for coding agents working in this repository.
 - Config is loaded only from YAML via `assistant run -c <path>`.
 - `printconfig` defaults to `false`. When enabled, it prints the full effective config without redaction.
 - Keep config validation in `internal/config`.
+- GLM uses the OpenAI-compatible chat completions API with `model_provider: glm`.
 - Use `yaml.Decoder.KnownFields(true)` or equivalent strict decoding for new config fields.
 - Do not reintroduce `.env` as the primary config path.
 

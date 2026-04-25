@@ -10,6 +10,7 @@ The service uses ADK-Go as the agent runtime:
 - `session.Service` is implemented by `internal/store.PostgresSessionService`.
 - `memory.Service` is implemented by `internal/store.PostgresMemoryService`.
 - The root `llmagent` receives a user message, ADK-managed conversation history, RAG context, memory tools, and optional MCP tools.
+- Model providers are selected by YAML: `echo` for local wiring, `gemini` through ADK-Go's Gemini adapter, and `glm` through the OpenAI-compatible GLM chat completions adapter.
 - Embeddings are provided by `internal/embedding`, with local hash embeddings for development and Gemini embeddings for semantic production retrieval.
 
 The first version has one root assistant agent. There are no sub-agents.

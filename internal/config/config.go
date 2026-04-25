@@ -24,6 +24,10 @@ type Config struct {
 	ModelProvider       string     `yaml:"model_provider"`
 	GeminiModel         string     `yaml:"gemini_model"`
 	GeminiAPIKey        string     `yaml:"gemini_api_key"`
+	GLMModel            string     `yaml:"glm_model"`
+	GLMAPIKey           string     `yaml:"glm_api_key"`
+	GLMBaseURL          string     `yaml:"glm_base_url"`
+	GLMThinkingType     string     `yaml:"glm_thinking_type"`
 	EmbeddingProvider   string     `yaml:"embedding_provider"`
 	EmbeddingModel      string     `yaml:"embedding_model"`
 	EmbeddingDimension  int        `yaml:"embedding_dimension"`
@@ -59,6 +63,8 @@ func LoadFile(path string) (Config, error) {
 		LogLevelText:       "info",
 		ModelProvider:      "echo",
 		GeminiModel:        "gemini-2.5-flash",
+		GLMModel:           "glm-4.6v",
+		GLMBaseURL:         "https://open.bigmodel.cn/api/paas/v4",
 		EmbeddingProvider:  "hash",
 		EmbeddingModel:     "text-embedding-004",
 		EmbeddingDimension: DefaultEmbeddingDimension,
@@ -78,6 +84,10 @@ func LoadFile(path string) (Config, error) {
 	cfg.DatabaseURL = strings.TrimSpace(cfg.DatabaseURL)
 	cfg.GeminiModel = strings.TrimSpace(cfg.GeminiModel)
 	cfg.GeminiAPIKey = strings.TrimSpace(cfg.GeminiAPIKey)
+	cfg.GLMModel = strings.TrimSpace(cfg.GLMModel)
+	cfg.GLMAPIKey = strings.TrimSpace(cfg.GLMAPIKey)
+	cfg.GLMBaseURL = strings.TrimRight(strings.TrimSpace(cfg.GLMBaseURL), "/")
+	cfg.GLMThinkingType = strings.ToLower(strings.TrimSpace(cfg.GLMThinkingType))
 	cfg.EmbeddingModel = strings.TrimSpace(cfg.EmbeddingModel)
 	cfg.OTelServiceName = strings.TrimSpace(cfg.OTelServiceName)
 	cfg.OTelEndpoint = strings.TrimSpace(cfg.OTelEndpoint)
@@ -89,11 +99,23 @@ func LoadFile(path string) (Config, error) {
 	if cfg.DatabaseURL == "" {
 		return Config{}, fmt.Errorf("database_url is required")
 	}
-	if cfg.ModelProvider != "echo" && cfg.ModelProvider != "gemini" {
-		return Config{}, fmt.Errorf("model_provider must be echo or gemini")
+	if cfg.ModelProvider != "echo" && cfg.ModelProvider != "gemini" && cfg.ModelProvider != "glm" {
+		return Config{}, fmt.Errorf("model_provider must be echo, gemini, or glm")
 	}
 	if cfg.ModelProvider == "gemini" && cfg.GeminiAPIKey == "" {
 		return Config{}, fmt.Errorf("gemini_api_key is required when model_provider is gemini")
+	}
+	if cfg.ModelProvider == "glm" && cfg.GLMAPIKey == "" {
+		return Config{}, fmt.Errorf("glm_api_key is required when model_provider is glm")
+	}
+	if cfg.ModelProvider == "glm" && cfg.GLMModel == "" {
+		return Config{}, fmt.Errorf("glm_model is required when model_provider is glm")
+	}
+	if cfg.ModelProvider == "glm" && cfg.GLMBaseURL == "" {
+		return Config{}, fmt.Errorf("glm_base_url is required when model_provider is glm")
+	}
+	if cfg.GLMThinkingType != "" && cfg.GLMThinkingType != "enabled" && cfg.GLMThinkingType != "disabled" {
+		return Config{}, fmt.Errorf("glm_thinking_type must be empty, enabled, or disabled")
 	}
 	if cfg.EmbeddingProvider != "hash" && cfg.EmbeddingProvider != "gemini" {
 		return Config{}, fmt.Errorf("embedding_provider must be hash or gemini")

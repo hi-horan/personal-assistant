@@ -58,6 +58,15 @@ type ChatResponse struct {
 	Memory    []store.MemoryResult `json:"memory"`
 }
 
+type ChatStreamEvent struct {
+	Type      string               `json:"type"`
+	SessionID string               `json:"session_id,omitempty"`
+	Text      string               `json:"text,omitempty"`
+	Response  *ChatResponse        `json:"response,omitempty"`
+	RAG       *rag.Result          `json:"rag,omitempty"`
+	Memory    []store.MemoryResult `json:"memory,omitempty"`
+}
+
 type CreateSessionRequest struct {
 	UserID    string         `json:"user_id"`
 	SessionID string         `json:"session_id,omitempty"`
@@ -84,7 +93,7 @@ type EventView struct {
 }
 
 func New(ctx context.Context, cfg config.Config, store *store.Store, logger *slog.Logger) (*Service, error) {
-	llm, err := modelx.New(ctx, cfg)
+	llm, err := modelx.New(ctx, cfg, logger)
 	if err != nil {
 		return nil, fmt.Errorf("create model: %w", err)
 	}
@@ -241,6 +250,126 @@ func (s *Service) Chat(ctx context.Context, req ChatRequest) (ChatResponse, erro
 		RAG:       ragResult,
 		Memory:    ragResult.Memories,
 	}, nil
+}
+
+func (s *Service) ChatStream(ctx context.Context, req ChatRequest, emit func(ChatStreamEvent) error) error {
+	ctx, span := s.tracer.Start(ctx, "app.ChatStream")
+	defer span.End()
+	start := time.Now()
+	status := "ok"
+	defer func() {
+		attrs := metric.WithAttributes(
+			attribute.String("model_provider", s.cfg.ModelProvider),
+			attribute.String("status", status),
+		)
+		s.metrics.chatRequests.Add(ctx, 1, attrs)
+		s.metrics.chatDuration.Record(ctx, time.Since(start).Seconds(), attrs)
+		if status != "ok" {
+			s.metrics.chatErrors.Add(ctx, 1, attrs)
+		}
+	}()
+
+	req.UserID = strings.TrimSpace(req.UserID)
+	req.Message = strings.TrimSpace(req.Message)
+	if req.UserID == "" {
+		status = "invalid"
+		return apperr.New(apperr.CodeInvalid, "user_id is required")
+	}
+	if req.Message == "" {
+		status = "invalid"
+		return apperr.New(apperr.CodeInvalid, "message is required")
+	}
+
+	sessionID, created, err := s.ensureSession(ctx, req.UserID, req.SessionID, titleFromMessage(req.Message))
+	if err != nil {
+		status = "session_error"
+		return err
+	}
+	ragResult, err := s.retriever.Retrieve(ctx, s.cfg.AppName, req.UserID, sessionID, req.Message, ragLimit)
+	if err != nil {
+		status = "rag_error"
+		return apperr.Wrap(apperr.CodeInternal, "retrieve memory context", err)
+	}
+	if err := emit(ChatStreamEvent{Type: "session", SessionID: sessionID, RAG: &ragResult, Memory: ragResult.Memories}); err != nil {
+		status = "client_error"
+		return err
+	}
+
+	s.logger.InfoContext(ctx, "chat stream started", slog.String("user_id", req.UserID), slog.String("session_id", sessionID), slog.Bool("new_session", created), slog.Int("memory_hits", len(ragResult.Memories)))
+	events := []EventView{}
+	answer := ""
+	prevPartial := ""
+	seq := s.runner.Run(
+		ctx,
+		req.UserID,
+		sessionID,
+		genai.NewContentFromText(req.Message, genai.RoleUser),
+		agent.RunConfig{StreamingMode: agent.StreamingModeSSE},
+		runner.WithStateDelta(map[string]any{
+			"rag_context": ragResult.Context,
+		}),
+	)
+	for event, runErr := range seq {
+		if runErr != nil {
+			status = "runner_error"
+			s.logger.ErrorContext(ctx, "chat stream run failed", slog.String("user_id", req.UserID), slog.String("session_id", sessionID), slog.Any("error", runErr))
+			return apperr.Wrap(apperr.CodeInternal, "run assistant", runErr)
+		}
+		view := eventView(event)
+		events = append(events, view)
+		if view.Text == "" {
+			continue
+		}
+		if event.IsFinalResponse() {
+			answer = view.Text
+			if view.Text != prevPartial {
+				if err := emit(ChatStreamEvent{Type: "delta", SessionID: sessionID, Text: view.Text}); err != nil {
+					status = "client_error"
+					return err
+				}
+			}
+			continue
+		}
+		prevPartial += view.Text
+		if err := emit(ChatStreamEvent{Type: "delta", SessionID: sessionID, Text: view.Text}); err != nil {
+			status = "client_error"
+			return err
+		}
+	}
+
+	getResp, err := s.store.Get(ctx, &session.GetRequest{
+		AppName:   s.cfg.AppName,
+		UserID:    req.UserID,
+		SessionID: sessionID,
+	})
+	if err != nil {
+		status = "session_error"
+		return apperr.Wrap(apperr.CodeInternal, "load session after chat", err)
+	}
+	if err := s.store.AddSessionToMemory(ctx, getResp.Session); err != nil {
+		status = "memory_error"
+		return apperr.Wrap(apperr.CodeInternal, "update long-term memory", err)
+	}
+	summary, err := s.store.RefreshSummary(ctx, s.cfg.AppName, req.UserID, sessionID)
+	if err != nil {
+		status = "summary_error"
+		return apperr.Wrap(apperr.CodeInternal, "refresh session summary", err)
+	}
+	ragResult.Summary = summary
+
+	response := ChatResponse{
+		SessionID: sessionID,
+		Answer:    answer,
+		Events:    events,
+		RAG:       ragResult,
+		Memory:    ragResult.Memories,
+	}
+	if err := emit(ChatStreamEvent{Type: "final", SessionID: sessionID, Text: answer, Response: &response}); err != nil {
+		status = "client_error"
+		return err
+	}
+	s.logger.InfoContext(ctx, "chat stream completed", slog.String("user_id", req.UserID), slog.String("session_id", sessionID), slog.Int("events", len(events)), slog.Int("answer_chars", len(answer)))
+	return nil
 }
 
 func newServiceMetrics() (serviceMetrics, error) {

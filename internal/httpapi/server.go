@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"strconv"
@@ -67,8 +68,11 @@ func newServerMetrics() serverMetrics {
 }
 
 func (s *Server) routes() {
+	s.mux.HandleFunc("GET /", s.webIndex)
+	s.mux.HandleFunc("GET /web/{file}", s.webAsset)
 	s.mux.HandleFunc("GET /healthz", s.health)
 	s.mux.HandleFunc("POST /v1/chat", s.chat)
+	s.mux.HandleFunc("POST /v1/chat/stream", s.chatStream)
 	s.mux.HandleFunc("POST /v1/sessions", s.createSession)
 	s.mux.HandleFunc("GET /v1/sessions", s.listSessions)
 	s.mux.HandleFunc("GET /v1/sessions/{session_id}", s.getSession)
@@ -98,6 +102,37 @@ func (s *Server) chat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, resp)
+}
+
+func (s *Server) chatStream(w http.ResponseWriter, r *http.Request) {
+	var req app.ChatRequest
+	if !decodeJSON(w, r, &req) {
+		return
+	}
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		s.writeError(w, r, apperr.New(apperr.CodeInternal, "streaming is unavailable"))
+		return
+	}
+	w.Header().Set("content-type", "text/event-stream")
+	w.Header().Set("cache-control", "no-cache")
+	w.Header().Set("connection", "keep-alive")
+	w.WriteHeader(http.StatusOK)
+
+	emit := func(event app.ChatStreamEvent) error {
+		if err := writeSSE(w, event.Type, event); err != nil {
+			return err
+		}
+		flusher.Flush()
+		return nil
+	}
+	if err := s.app.ChatStream(r.Context(), req, emit); err != nil {
+		_ = writeSSE(w, "error", map[string]any{"message": apperr.MessageOf(err), "code": apperr.CodeOf(err)})
+		flusher.Flush()
+		return
+	}
+	_ = writeSSE(w, "done", map[string]any{"ok": true})
+	flusher.Flush()
 }
 
 func (s *Server) createSession(w http.ResponseWriter, r *http.Request) {
@@ -234,6 +269,20 @@ func writeJSON(w http.ResponseWriter, status int, payload any) {
 	w.Header().Set("content-type", "application/json")
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(payload)
+}
+
+func writeSSE(w http.ResponseWriter, event string, payload any) error {
+	data, err := json.Marshal(payload)
+	if err != nil {
+		return err
+	}
+	if _, err := fmt.Fprintf(w, "event: %s\n", event); err != nil {
+		return err
+	}
+	if _, err := fmt.Fprintf(w, "data: %s\n\n", data); err != nil {
+		return err
+	}
+	return nil
 }
 
 func defaultValue(value, fallback string) string {
