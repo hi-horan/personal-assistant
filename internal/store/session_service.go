@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -52,7 +53,7 @@ func (s *Store) Create(ctx context.Context, req *session.CreateRequest) (*sessio
 		return nil, fmt.Errorf("insert session: %w", err)
 	}
 
-	s.logger.InfoContext(ctx, "session created", "app", req.AppName, "user_id", req.UserID, "session_id", id)
+	s.logger.InfoContext(ctx, "session created", slog.String("app", req.AppName), slog.String("user_id", req.UserID), slog.String("session_id", id))
 	return &session.CreateResponse{Session: &Session{
 		IDVal:         id,
 		AppNameVal:    req.AppName,
@@ -146,7 +147,7 @@ func (s *Store) Delete(ctx context.Context, req *session.DeleteRequest) error {
 	if tag.RowsAffected() == 0 {
 		return fmt.Errorf("session %q not found", req.SessionID)
 	}
-	s.logger.InfoContext(ctx, "session deleted", "app", req.AppName, "user_id", req.UserID, "session_id", req.SessionID)
+	s.logger.InfoContext(ctx, "session deleted", slog.String("app", req.AppName), slog.String("user_id", req.UserID), slog.String("session_id", req.SessionID))
 	return nil
 }
 
@@ -237,7 +238,7 @@ func (s *Store) AppendEvent(ctx context.Context, sess session.Session, event *se
 		return fmt.Errorf("commit append event: %w", err)
 	}
 	s.metrics.sessionEventsAppended.Add(ctx, 1, metric.WithAttributes(attribute.String("author", event.Author)))
-	s.logger.DebugContext(ctx, "session event appended", "session_id", sess.ID(), "event_id", event.ID, "author", event.Author)
+	s.logger.DebugContext(ctx, "session event appended", slog.String("session_id", sess.ID()), slog.String("event_id", event.ID), slog.String("author", event.Author))
 	return nil
 }
 

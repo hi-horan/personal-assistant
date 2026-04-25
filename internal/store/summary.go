@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"strings"
 
 	"github.com/jackc/pgx/v5"
@@ -69,7 +70,7 @@ func (s *Store) RefreshSummary(ctx context.Context, appName, userID, sessionID s
 	if err != nil {
 		return "", fmt.Errorf("upsert session summary: %w", err)
 	}
-	s.logger.DebugContext(ctx, "session summary refreshed", "session_id", sessionID, "chars", len(summary))
+	s.logger.DebugContext(ctx, "session summary refreshed", slog.String("session_id", sessionID), slog.Int("chars", len(summary)))
 	return summary, nil
 }
 

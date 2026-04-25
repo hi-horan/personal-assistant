@@ -17,7 +17,7 @@ import (
 
 func InitTracer(ctx context.Context, serviceName, endpoint string, logger *slog.Logger) (func(context.Context) error, error) {
 	if endpoint == "" {
-		logger.Info("otel disabled", "reason", "OTEL_EXPORTER_OTLP_ENDPOINT not set")
+		logger.Info("otel disabled", slog.String("reason", "OTEL_EXPORTER_OTLP_ENDPOINT not set"))
 		return func(context.Context) error { return nil }, nil
 	}
 
@@ -36,13 +36,13 @@ func InitTracer(ctx context.Context, serviceName, endpoint string, logger *slog.
 		sdktrace.WithResource(res),
 	)
 	otel.SetTracerProvider(provider)
-	logger.Info("otel enabled", "endpoint", endpoint, "service", serviceName)
+	logger.Info("otel enabled", slog.String("endpoint", endpoint), slog.String("service", serviceName))
 	return provider.Shutdown, nil
 }
 
 func InitMeter(ctx context.Context, serviceName, endpoint string, logger *slog.Logger) (func(context.Context) error, error) {
 	if endpoint == "" {
-		logger.Info("otel metrics disabled", "reason", "otel metrics endpoint not set")
+		logger.Info("otel metrics disabled", slog.String("reason", "otel metrics endpoint not set"))
 		return func(context.Context) error { return nil }, nil
 	}
 
@@ -61,7 +61,7 @@ func InitMeter(ctx context.Context, serviceName, endpoint string, logger *slog.L
 		sdkmetric.WithResource(res),
 	)
 	otel.SetMeterProvider(provider)
-	logger.Info("otel metrics enabled", "endpoint", endpoint, "service", serviceName)
+	logger.Info("otel metrics enabled", slog.String("endpoint", endpoint), slog.String("service", serviceName))
 	return provider.Shutdown, nil
 }
 

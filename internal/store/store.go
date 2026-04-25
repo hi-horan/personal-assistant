@@ -96,7 +96,7 @@ func (s *Store) RunMigrations(ctx context.Context) error {
 		if _, err := s.pool.Exec(ctx, string(sql)); err != nil {
 			return fmt.Errorf("run migration %s: %w", path, err)
 		}
-		s.logger.InfoContext(ctx, "migration applied", "migration", entry.Name())
+		s.logger.InfoContext(ctx, "migration applied", slog.String("migration", entry.Name()))
 	}
 	return nil
 }

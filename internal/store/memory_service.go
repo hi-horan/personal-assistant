@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -82,7 +83,7 @@ func (s *Store) AddSessionToMemory(ctx context.Context, sess session.Session) er
 		}
 		count++
 	}
-	s.logger.DebugContext(ctx, "session added to memory", "session_id", sess.ID(), "events_considered", count)
+	s.logger.DebugContext(ctx, "session added to memory", slog.String("session_id", sess.ID()), slog.Int("events_considered", count))
 	return nil
 }
 
@@ -191,7 +192,7 @@ func (s *Store) SaveMemory(ctx context.Context, rec MemoryRecord) (string, error
 		return "", fmt.Errorf("commit save memory: %w", err)
 	}
 	s.metrics.memoryWrites.Add(ctx, 1, metric.WithAttributes(attribute.String("kind", rec.Kind)))
-	s.logger.InfoContext(ctx, "memory saved", "memory_id", memoryID, "app", rec.AppName, "user_id", rec.UserID, "kind", rec.Kind)
+	s.logger.InfoContext(ctx, "memory saved", slog.String("memory_id", memoryID), slog.String("app", rec.AppName), slog.String("user_id", rec.UserID), slog.String("kind", rec.Kind))
 	return memoryID, nil
 }
 
@@ -283,7 +284,7 @@ func (s *Store) SearchMemories(ctx context.Context, appName, userID, query strin
 	}
 	s.metrics.memorySearches.Add(ctx, 1, metric.WithAttributes(attribute.String("mode", "hybrid")))
 	s.metrics.memorySearchResults.Record(ctx, int64(len(results)), metric.WithAttributes(attribute.String("mode", "hybrid")))
-	s.logger.DebugContext(ctx, "memory search completed", "app", appName, "user_id", userID, "query", query, "count", len(results))
+	s.logger.DebugContext(ctx, "memory search completed", slog.String("app", appName), slog.String("user_id", userID), slog.String("query", query), slog.Int("count", len(results)))
 	return results, nil
 }
 

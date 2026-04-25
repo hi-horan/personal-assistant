@@ -202,9 +202,9 @@ func (s *Server) writeError(w http.ResponseWriter, r *http.Request, err error) {
 	status := statusFor(code)
 	msg := apperr.MessageOf(err)
 	if status >= 500 && !errors.Is(r.Context().Err(), context.Canceled) {
-		s.logger.ErrorContext(r.Context(), "request failed", "method", r.Method, "path", r.URL.Path, "code", code, "error", err)
+		s.logger.ErrorContext(r.Context(), "request failed", slog.String("method", r.Method), slog.String("path", r.URL.Path), slog.String("code", string(code)), slog.Any("error", err))
 	} else {
-		s.logger.InfoContext(r.Context(), "request rejected", "method", r.Method, "path", r.URL.Path, "code", code, "message", msg)
+		s.logger.InfoContext(r.Context(), "request rejected", slog.String("method", r.Method), slog.String("path", r.URL.Path), slog.String("code", string(code)), slog.String("message", msg))
 	}
 	if s.metrics.errors != nil {
 		s.metrics.errors.Add(r.Context(), 1, metric.WithAttributes(

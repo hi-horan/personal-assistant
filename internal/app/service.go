@@ -105,7 +105,7 @@ func New(ctx context.Context, cfg config.Config, store *store.Store, logger *slo
 	if err != nil {
 		return nil, err
 	}
-	logger.Info("agent tools configured", "tools", len(tools), "mcp_toolsets", len(toolsets))
+	logger.Info("agent tools configured", slog.Int("tools", len(tools)), slog.Int("mcp_toolsets", len(toolsets)))
 
 	rootAgent, err := llmagent.New(llmagent.Config{
 		Name:        "personal_assistant",
@@ -184,7 +184,7 @@ func (s *Service) Chat(ctx context.Context, req ChatRequest) (ChatResponse, erro
 		return ChatResponse{}, apperr.Wrap(apperr.CodeInternal, "retrieve memory context", err)
 	}
 
-	s.logger.InfoContext(ctx, "chat started", "user_id", req.UserID, "session_id", sessionID, "new_session", created, "memory_hits", len(ragResult.Memories))
+	s.logger.InfoContext(ctx, "chat started", slog.String("user_id", req.UserID), slog.String("session_id", sessionID), slog.Bool("new_session", created), slog.Int("memory_hits", len(ragResult.Memories)))
 	events := []EventView{}
 	answer := ""
 	seq := s.runner.Run(
@@ -200,7 +200,7 @@ func (s *Service) Chat(ctx context.Context, req ChatRequest) (ChatResponse, erro
 	for event, runErr := range seq {
 		if runErr != nil {
 			status = "runner_error"
-			s.logger.ErrorContext(ctx, "chat run failed", "user_id", req.UserID, "session_id", sessionID, "error", runErr)
+			s.logger.ErrorContext(ctx, "chat run failed", slog.String("user_id", req.UserID), slog.String("session_id", sessionID), slog.Any("error", runErr))
 			return ChatResponse{}, apperr.Wrap(apperr.CodeInternal, "run assistant", runErr)
 		}
 		view := eventView(event)
@@ -233,7 +233,7 @@ func (s *Service) Chat(ctx context.Context, req ChatRequest) (ChatResponse, erro
 	}
 	ragResult.Summary = summary
 
-	s.logger.InfoContext(ctx, "chat completed", "user_id", req.UserID, "session_id", sessionID, "events", len(events), "answer_chars", len(answer))
+	s.logger.InfoContext(ctx, "chat completed", slog.String("user_id", req.UserID), slog.String("session_id", sessionID), slog.Int("events", len(events)), slog.Int("answer_chars", len(answer)))
 	return ChatResponse{
 		SessionID: sessionID,
 		Answer:    answer,

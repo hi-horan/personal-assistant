@@ -24,66 +24,66 @@ func run(ctx context.Context, configPath string) error {
 
 	cfg, err := config.LoadFile(configPath)
 	if err != nil {
-		slog.Error("load config", "path", configPath, "error", err)
+		slog.Error("load config", slog.String("path", configPath), slog.Any("error", err))
 		return err
 	}
 	logger := observability.NewLogger(cfg.LogLevel)
 	slog.SetDefault(logger)
 	if cfg.PrintConfig {
 		if err := config.PrintEffective(os.Stdout, cfg); err != nil {
-			logger.Error("print config", "error", err)
+			logger.Error("print config", slog.Any("error", err))
 			return err
 		}
 	}
-	logger.Info("config loaded", "path", configPath, "app", cfg.AppName)
+	logger.Info("config loaded", slog.String("path", configPath), slog.String("app", cfg.AppName))
 
 	shutdownTracer, err := observability.InitTracer(ctx, cfg.OTelServiceName, cfg.OTelEndpoint, logger)
 	if err != nil {
-		logger.Error("init telemetry", "error", err)
+		logger.Error("init telemetry", slog.Any("error", err))
 		return err
 	}
 	defer func() {
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 		if err := shutdownTracer(shutdownCtx); err != nil {
-			logger.Error("shutdown telemetry", "error", err)
+			logger.Error("shutdown telemetry", slog.Any("error", err))
 		}
 	}()
 	shutdownMeter, err := observability.InitMeter(ctx, cfg.OTelServiceName, cfg.OTelMetricsEndpoint, logger)
 	if err != nil {
-		logger.Error("init metrics", "error", err)
+		logger.Error("init metrics", slog.Any("error", err))
 		return err
 	}
 	defer func() {
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 		if err := shutdownMeter(shutdownCtx); err != nil {
-			logger.Error("shutdown metrics", "error", err)
+			logger.Error("shutdown metrics", slog.Any("error", err))
 		}
 	}()
 
 	embedder, err := embedding.New(ctx, cfg)
 	if err != nil {
-		logger.Error("create embedding provider", "error", err)
+		logger.Error("create embedding provider", slog.Any("error", err))
 		return err
 	}
-	logger.Info("embedding provider configured", "provider", embedder.Name(), "dimension", embedder.Dimension())
+	logger.Info("embedding provider configured", slog.String("provider", embedder.Name()), slog.Int("dimension", embedder.Dimension()))
 
 	storeSvc, err := store.New(ctx, cfg.DatabaseURL, logger, embedder)
 	if err != nil {
-		logger.Error("connect store", "error", err)
+		logger.Error("connect store", slog.Any("error", err))
 		return err
 	}
 	defer storeSvc.Close()
 
 	if err := storeSvc.RunMigrations(ctx); err != nil {
-		logger.Error("run migrations", "error", err)
+		logger.Error("run migrations", slog.Any("error", err))
 		return err
 	}
 
 	appSvc, err := app.New(ctx, cfg, storeSvc, logger)
 	if err != nil {
-		logger.Error("wire app", "error", err)
+		logger.Error("wire app", slog.Any("error", err))
 		return err
 	}
 
@@ -94,7 +94,7 @@ func run(ctx context.Context, configPath string) error {
 	}
 	serverErr := make(chan error, 1)
 	go func() {
-		logger.Info("http server starting", "addr", cfg.HTTPAddr, "model_provider", cfg.ModelProvider)
+		logger.Info("http server starting", slog.String("addr", cfg.HTTPAddr), slog.String("model_provider", cfg.ModelProvider))
 		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			serverErr <- err
 			return
@@ -106,7 +106,7 @@ func run(ctx context.Context, configPath string) error {
 	case <-ctx.Done():
 	case err := <-serverErr:
 		if err != nil {
-			logger.Error("http server failed", "error", err)
+			logger.Error("http server failed", slog.Any("error", err))
 			return err
 		}
 		return nil
@@ -115,7 +115,7 @@ func run(ctx context.Context, configPath string) error {
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	if err := server.Shutdown(shutdownCtx); err != nil {
-		logger.Error("http server shutdown failed", "error", err)
+		logger.Error("http server shutdown failed", slog.Any("error", err))
 		return err
 	}
 	logger.Info("shutdown complete")

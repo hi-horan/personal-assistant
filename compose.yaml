@@ -58,7 +58,7 @@ services:
       - personal-assistant
     volumes:
       - ./deploy/tempo/tempo.yaml:/etc/tempo/tempo.yaml:ro
-      - tempo-data:/tmp/tempo
+      - tempo-data:/var/tempo
 
   prometheus:
     image: prom/prometheus:v3.11.2-distroless
