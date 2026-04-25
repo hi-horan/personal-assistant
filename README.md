@@ -124,6 +124,12 @@ Local service URLs:
 
 Grafana provisions the `Personal Assistant Overview` dashboard automatically under the `Personal Assistant` folder. It includes panels for chat volume and latency, HTTP errors, RAG retrievals and latency, memory writes/searches, session events, OTel Collector trace/metric pipeline health, and recent Tempo traces.
 
+To inspect traces directly, open Grafana, go to `Explore`, select the `Tempo` data source, and run a TraceQL query such as:
+
+```text
+{resource.service.name="personal-assistant"}
+```
+
 Stop services with:
 
 ```sh
