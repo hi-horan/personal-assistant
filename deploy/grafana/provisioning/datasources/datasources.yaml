@@ -36,3 +36,6 @@ datasources:
       spanBar:
         type: Tag
         tag: http.route
+      streamingEnabled:
+        search: false
+        metrics: false
