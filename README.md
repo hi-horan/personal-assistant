@@ -132,7 +132,7 @@ To inspect traces directly, open Grafana, go to `Explore`, select the `Tempo` da
 {resource.service.name="personal-assistant"}
 ```
 
-The local Grafana Tempo data source uses HTTP query APIs. Streaming search and streaming metrics are explicitly disabled because Grafana derives Tempo streaming gRPC from the data source URL, and the Compose stack points that URL at Tempo's HTTP endpoint.
+The local Grafana Tempo data source uses Tempo streaming over HTTP. Tempo is configured with `stream_over_http_enabled: true`, which lets Grafana use the streaming gRPC query API through the same `http://tempo:3200` data source URL. Do not point Grafana at `tempo:4317`; that port is OTLP ingest, not the Tempo query API.
 
 Stop services with:
 

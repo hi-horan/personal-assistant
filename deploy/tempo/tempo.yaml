@@ -1,12 +1,14 @@
 server:
   http_listen_port: 3200
 
+stream_over_http_enabled: true
+
 distributor:
   receivers:
     otlp:
       protocols:
-        # grpc:
-          # endpoint: 0.0.0.0:4317
+        grpc:
+          endpoint: 0.0.0.0:4317
         http:
           endpoint: 0.0.0.0:4318
 
