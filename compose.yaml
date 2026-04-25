@@ -1,0 +1,107 @@
+services:
+  postgres:
+    image: pgvector/pgvector:0.8.2-pg16-bookworm
+    environment:
+      POSTGRES_DB: personal_assistant
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    networks:
+      - personal-assistant
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d personal_assistant"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  assistant:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: personal-assistant:dev
+    depends_on:
+      postgres:
+        condition: service_healthy
+      otel-collector:
+        condition: service_started
+    command: ["run", "-c", "/app/config.yaml"]
+    ports:
+      - "8080:8080"
+    networks:
+      - personal-assistant
+    volumes:
+      - ./config.compose.yaml:/app/config.yaml:ro
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.150.1
+    depends_on:
+      tempo:
+        condition: service_started
+    command: ["--config=/etc/otelcol-contrib/config.yaml"]
+    ports:
+      - "4318:4318"
+      - "8889:8889"
+    networks:
+      - personal-assistant
+    volumes:
+      - ./deploy/otel/collector.yaml:/etc/otelcol-contrib/config.yaml:ro
+
+  tempo:
+    image: grafana/tempo:2.8.4
+    command: ["-config.file=/etc/tempo/tempo.yaml"]
+    ports:
+      - "3200:3200"
+    networks:
+      - personal-assistant
+    volumes:
+      - ./deploy/tempo/tempo.yaml:/etc/tempo/tempo.yaml:ro
+      - tempo-data:/tmp/tempo
+
+  prometheus:
+    image: prom/prometheus:v3.11.2-distroless
+    depends_on:
+      otel-collector:
+        condition: service_started
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yaml"
+      - "--storage.tsdb.path=/prometheus"
+    ports:
+      - "9090:9090"
+    networks:
+      - personal-assistant
+    volumes:
+      - ./deploy/prometheus/prometheus.yaml:/etc/prometheus/prometheus.yaml:ro
+      - prometheus-data:/prometheus
+
+  grafana:
+    image: grafana/grafana:13.0.1
+    depends_on:
+      prometheus:
+        condition: service_started
+      tempo:
+        condition: service_started
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    ports:
+      - "3000:3000"
+    networks:
+      - personal-assistant
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./deploy/grafana/provisioning:/etc/grafana/provisioning:ro
+
+volumes:
+  postgres-data:
+  prometheus-data:
+  grafana-data:
+  tempo-data:
+
+networks:
+  personal-assistant:
+    name: personal-assistant
+    driver: bridge

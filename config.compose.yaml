@@ -1,0 +1,19 @@
+http_addr: ":8080"
+app_name: personal-assistant
+database_url: "postgres://postgres:postgres@postgres:5432/personal_assistant?sslmode=disable"
+log_level: info
+
+model_provider: echo
+gemini_model: gemini-2.5-flash
+gemini_api_key: ""
+
+embedding_provider: hash
+embedding_model: text-embedding-004
+embedding_dimension: 768
+
+otel_service_name: personal-assistant
+otel_exporter_otlp_endpoint: "http://otel-collector:4318"
+otel_metrics_endpoint: ""
+
+mcp:
+  servers: []
