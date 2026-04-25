@@ -12,7 +12,7 @@ datasources:
     orgId: 1
     uid: prometheus
     type: prometheus
-    version: 3
+    version: 4
     access: proxy
     url: http://prometheus:9090
     isDefault: true
@@ -21,7 +21,7 @@ datasources:
     orgId: 1
     uid: tempo
     type: tempo
-    version: 3
+    version: 4
     access: proxy
     url: http://tempo:3200
     editable: false
@@ -38,6 +38,3 @@ datasources:
       spanBar:
         type: Tag
         tag: http.route
-      streamingEnabled:
-        search: true
-        metrics: true

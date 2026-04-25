@@ -614,7 +614,7 @@
             "type": "tempo",
             "uid": "tempo"
           },
-          "query": "{resource.service.name=\"personal-assistant\"}",
+          "query": "{}",
           "queryType": "traceql",
           "refId": "A"
         }
