@@ -594,7 +594,15 @@
         "uid": "tempo"
       },
       "fieldConfig": {
-        "defaults": {},
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": false
+          }
+        },
         "overrides": []
       },
       "gridPos": {
@@ -605,8 +613,16 @@
       },
       "id": 12,
       "options": {
-        "showTrace": false,
-        "sortOrder": "Descending"
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true
       },
       "targets": [
         {
@@ -620,7 +636,7 @@
         }
       ],
       "title": "Recent Traces",
-      "type": "traces"
+      "type": "table"
     }
   ],
   "refresh": "10s",

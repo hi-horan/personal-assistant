@@ -134,7 +134,7 @@ To inspect traces directly, open Grafana, go to `Explore`, select the `Tempo` da
 {resource.service.name="personal-assistant"}
 ```
 
-The local Grafana Tempo data source uses Tempo streaming over HTTP. Tempo is configured with `stream_over_http_enabled: true`, which lets Grafana use the streaming gRPC query API through the same `http://tempo:3200` data source URL. Do not point Grafana at `tempo:4317`; that port is OTLP ingest, not the Tempo query API.
+The local Grafana Tempo data source uses Tempo's HTTP query API at `http://tempo:3200`. Do not point Grafana at `tempo:4317`; that port is OTLP ingest, not the Tempo query API. The dashboard's trace panel starts with a broad `{}` TraceQL query so Grafana display issues can be separated from service-name filtering.
 
 Stop services with:
 
