@@ -1,5 +1,6 @@
 http_addr: ":8080"
 app_name: personal-assistant
+printconfig: false
 database_url: "postgres://postgres:postgres@postgres:5432/personal_assistant?sslmode=disable"
 log_level: info
 

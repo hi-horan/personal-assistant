@@ -3,6 +3,7 @@ package config
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"log/slog"
 	"os"
 	"strconv"
@@ -16,6 +17,7 @@ const DefaultEmbeddingDimension = 768
 type Config struct {
 	HTTPAddr            string     `yaml:"http_addr"`
 	AppName             string     `yaml:"app_name"`
+	PrintConfig         bool       `yaml:"printconfig"`
 	DatabaseURL         string     `yaml:"database_url"`
 	LogLevel            slog.Level `yaml:"-"`
 	LogLevelText        string     `yaml:"log_level"`
@@ -67,6 +69,7 @@ func LoadFile(path string) (Config, error) {
 	if err := decoder.Decode(&cfg); err != nil {
 		return Config{}, fmt.Errorf("parse config %q: %w", path, err)
 	}
+	cfg.LogLevelText = normalizeLogLevelText(cfg.LogLevelText)
 	cfg.LogLevel = parseLogLevel(cfg.LogLevelText)
 	cfg.ModelProvider = strings.ToLower(strings.TrimSpace(cfg.ModelProvider))
 	cfg.EmbeddingProvider = strings.ToLower(strings.TrimSpace(cfg.EmbeddingProvider))
@@ -110,6 +113,23 @@ func LoadFile(path string) (Config, error) {
 	return cfg, nil
 }
 
+func PrintEffective(w io.Writer, cfg Config) error {
+	data, err := yaml.Marshal(cfg)
+	if err != nil {
+		return fmt.Errorf("marshal effective config: %w", err)
+	}
+	if _, err := fmt.Fprintln(w, "--- effective config ---"); err != nil {
+		return fmt.Errorf("write effective config header: %w", err)
+	}
+	if _, err := w.Write(data); err != nil {
+		return fmt.Errorf("write effective config: %w", err)
+	}
+	if _, err := fmt.Fprintln(w, "--- end effective config ---"); err != nil {
+		return fmt.Errorf("write effective config footer: %w", err)
+	}
+	return nil
+}
+
 func validateMCPConfig(cfg MCPConfig) error {
 	for i, server := range cfg.Servers {
 		if strings.TrimSpace(server.Name) == "" {
@@ -123,7 +143,7 @@ func validateMCPConfig(cfg MCPConfig) error {
 }
 
 func parseLogLevel(value string) slog.Level {
-	switch strings.ToLower(strings.TrimSpace(value)) {
+	switch normalizeLogLevelText(value) {
 	case "debug":
 		return slog.LevelDebug
 	case "warn", "warning":
@@ -132,5 +152,18 @@ func parseLogLevel(value string) slog.Level {
 		return slog.LevelError
 	default:
 		return slog.LevelInfo
+	}
+}
+
+func normalizeLogLevelText(value string) string {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "debug":
+		return "debug"
+	case "warn", "warning":
+		return "warn"
+	case "error":
+		return "error"
+	default:
+		return "info"
 	}
 }

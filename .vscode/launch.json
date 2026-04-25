@@ -1,0 +1,19 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "run",
+            "type": "go",
+            "request": "launch",
+            "program": "${workspaceFolder}/cmd/assistant",
+            "console": "integratedTerminal",
+            "env": {
+            },
+            "args": [
+                "run", "-c", "${workspaceFolder}/config.yaml"
+            ],
+            "output": "${workspaceFolder}/bin/_agent_debug.exe",
+            // "showLog": true,
+        }
+    ]
+}

@@ -1,7 +1,7 @@
 APP_NAME ?= assistant
 BIN_DIR ?= bin
 BIN ?= $(BIN_DIR)/$(APP_NAME)
-CONFIG ?= config.example.yaml
+CONFIG ?= config.yaml
 GO ?= go
 PKG ?= ./...
 IMAGE ?= personal-assistant:dev

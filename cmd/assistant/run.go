@@ -29,6 +29,12 @@ func run(ctx context.Context, configPath string) error {
 	}
 	logger := observability.NewLogger(cfg.LogLevel)
 	slog.SetDefault(logger)
+	if cfg.PrintConfig {
+		if err := config.PrintEffective(os.Stdout, cfg); err != nil {
+			logger.Error("print config", "error", err)
+			return err
+		}
+	}
 	logger.Info("config loaded", "path", configPath, "app", cfg.AppName)
 
 	shutdownTracer, err := observability.InitTracer(ctx, cfg.OTelServiceName, cfg.OTelEndpoint, logger)

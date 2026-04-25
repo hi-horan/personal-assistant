@@ -26,10 +26,7 @@ func InitTracer(ctx context.Context, serviceName, endpoint string, logger *slog.
 		return nil, fmt.Errorf("create otlp trace exporter: %w", err)
 	}
 
-	res, err := resource.Merge(
-		resource.Default(),
-		resource.NewWithAttributes(semconv.SchemaURL, semconv.ServiceName(serviceName)),
-	)
+	res, err := newServiceResource(serviceName)
 	if err != nil {
 		return nil, fmt.Errorf("create otel resource: %w", err)
 	}
@@ -54,10 +51,7 @@ func InitMeter(ctx context.Context, serviceName, endpoint string, logger *slog.L
 		return nil, fmt.Errorf("create otlp metric exporter: %w", err)
 	}
 
-	res, err := resource.Merge(
-		resource.Default(),
-		resource.NewWithAttributes(semconv.SchemaURL, semconv.ServiceName(serviceName)),
-	)
+	res, err := newServiceResource(serviceName)
 	if err != nil {
 		return nil, fmt.Errorf("create otel metric resource: %w", err)
 	}
@@ -69,4 +63,11 @@ func InitMeter(ctx context.Context, serviceName, endpoint string, logger *slog.L
 	otel.SetMeterProvider(provider)
 	logger.Info("otel metrics enabled", "endpoint", endpoint, "service", serviceName)
 	return provider.Shutdown, nil
+}
+
+func newServiceResource(serviceName string) (*resource.Resource, error) {
+	return resource.Merge(
+		resource.Default(),
+		resource.NewSchemaless(semconv.ServiceName(serviceName)),
+	)
 }

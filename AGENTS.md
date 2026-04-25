@@ -43,6 +43,7 @@ Project rules for coding agents working in this repository.
 - Docker Compose images should use explicit version tags, not `latest`, `main`, or floating major tags.
 - Local config should be named `config.yaml`; it is ignored by git.
 - Config is loaded only from YAML via `assistant run -c <path>`.
+- `printconfig` defaults to `false`. When enabled, it prints the full effective config without redaction.
 - Keep config validation in `internal/config`.
 - Use `yaml.Decoder.KnownFields(true)` or equivalent strict decoding for new config fields.
 - Do not reintroduce `.env` as the primary config path.
@@ -82,7 +83,7 @@ Project rules for coding agents working in this repository.
 ## Logging And Telemetry
 
 - Use `slog`; do not introduce another logging framework.
-- Logs should include relative source file and line number. Do not emit absolute source paths.
+- Logs should include a relative `source` value in `path/to/file.go:line` form. Do not emit absolute source paths.
 - Request-scoped logs should use `InfoContext`, `ErrorContext`, or equivalent so `trace_id` and `span_id` are recorded.
 - Log startup, config path, migration, HTTP server lifecycle, chat start/end, memory writes/searches, session changes, MCP setup, and shutdown.
 - Avoid logging secrets, API keys, raw credentials, or full config payloads.

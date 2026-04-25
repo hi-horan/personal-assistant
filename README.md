@@ -32,6 +32,8 @@ make run
 
 The service reads configuration from YAML, runs migrations at startup, and listens on `http_addr`, defaulting to `:8080`.
 
+Set `printconfig: true` to print the final effective configuration at startup after defaults, normalization, and derived values are applied. It defaults to `false` and prints full values without redaction.
+
 For local wiring without a model key, keep `model_provider: echo`. For real calls, update `config.yaml`:
 
 ```yaml
@@ -120,6 +122,8 @@ Local service URLs:
 - Tempo: `http://localhost:3200`
 - OTel Collector OTLP HTTP: `http://localhost:4318`
 
+Grafana provisions the `Personal Assistant Overview` dashboard automatically under the `Personal Assistant` folder. It includes panels for chat volume and latency, HTTP errors, RAG retrievals and latency, memory writes/searches, session events, OTel Collector trace/metric pipeline health, and recent Tempo traces.
+
 Stop services with:
 
 ```sh
@@ -128,7 +132,7 @@ make docker-down
 
 ## Observability
 
-Logs are JSON lines written to stdout. Logs include relative source file and line number. Logs emitted with a request context include `trace_id` and `span_id`, so they can be correlated with OpenTelemetry traces.
+Logs are JSON lines written to stdout. Logs include a relative `source` value in `path/to/file.go:line` form. Logs emitted with a request context include `trace_id` and `span_id`, so they can be correlated with OpenTelemetry traces.
 
 Set `otel_exporter_otlp_endpoint` to enable OTLP HTTP trace export. Metrics use the same endpoint by default; set `otel_metrics_endpoint` only when metrics should go to a different OTLP HTTP endpoint.
 

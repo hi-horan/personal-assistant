@@ -2,6 +2,7 @@ package observability
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -56,11 +57,7 @@ func replaceSourceAttr(_ []string, attr slog.Attr) slog.Attr {
 	if file == "" {
 		return slog.Attr{}
 	}
-	return slog.Group(
-		slog.SourceKey,
-		slog.String("file", file),
-		slog.Int("line", source.Line),
-	)
+	return slog.String(slog.SourceKey, fmt.Sprintf("%s:%d", file, source.Line))
 }
 
 func relativeSourceFile(file string) string {

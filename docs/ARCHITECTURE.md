@@ -5,6 +5,7 @@
 The service uses ADK-Go as the agent runtime:
 
 - Cobra exposes `assistant run -c config.yaml` as the service command.
+- `printconfig: true` prints the final effective YAML configuration at startup after defaults, normalization, and derived values are applied. The dump is not redacted.
 - `runner.Run` owns each chat invocation.
 - `session.Service` is implemented by `internal/store.PostgresSessionService`.
 - `memory.Service` is implemented by `internal/store.PostgresMemoryService`.
@@ -63,7 +64,7 @@ MCP is optional and configured in YAML under `mcp.servers`. Each configured stdi
 ## Observability
 
 - `slog` is the only logger.
-- Logs include relative source file and line number; absolute source paths are not emitted.
+- Logs include a relative `source` value in `path/to/file.go:line` form; absolute source paths are not emitted.
 - Request-scoped `slog` records include `trace_id` and `span_id` from the active OpenTelemetry span.
 - Logs record startup, migration, chat start/end, session writes, memory writes/searches, RAG retrieval, MCP setup, and shutdown.
 - OpenTelemetry traces instrument HTTP requests and internal chat/RAG/memory/session spans.
