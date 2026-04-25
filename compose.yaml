@@ -2,6 +2,8 @@ services:
   postgres:
     image: pgvector/pgvector:0.8.2-pg16-bookworm
     environment:
+      TZ: Asia/Shanghai
+      PGTZ: Asia/Shanghai
       POSTGRES_DB: personal_assistant
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
@@ -28,6 +30,8 @@ services:
       otel-collector:
         condition: service_started
     command: ["run", "-c", "/app/config.yaml"]
+    environment:
+      TZ: Asia/Shanghai
     ports:
       - "8080:8080"
     networks:
@@ -37,6 +41,8 @@ services:
 
   otel-collector:
     image: otel/opentelemetry-collector-contrib:0.150.1
+    environment:
+      TZ: Asia/Shanghai
     depends_on:
       tempo:
         condition: service_started
@@ -51,6 +57,8 @@ services:
 
   tempo:
     image: grafana/tempo:2.8.4
+    environment:
+      TZ: Asia/Shanghai
     command: ["-config.file=/etc/tempo/tempo.yaml"]
     ports:
       - "3200:3200"
@@ -62,6 +70,8 @@ services:
 
   prometheus:
     image: prom/prometheus:v3.11.2-distroless
+    environment:
+      TZ: Asia/Shanghai
     depends_on:
       otel-collector:
         condition: service_started
@@ -89,6 +99,8 @@ services:
       GF_USERS_ALLOW_SIGN_UP: "false"
       GF_PLUGINS_PREINSTALL_DISABLED: "true"
       GF_PLUGINS_PREINSTALL_AUTO_UPDATE: "false"
+      GF_DATE_FORMATS_DEFAULT_TIMEZONE: Asia/Shanghai
+      TZ: Asia/Shanghai
     ports:
       - "3000:3000"
     networks:

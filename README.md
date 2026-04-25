@@ -106,6 +106,8 @@ make docker-up
 
 Compose uses pinned image tags and `config.compose.yaml`, which points `database_url` at the `postgres` service and exports OTel data to `otel-collector`.
 
+All Compose services run with `TZ=Asia/Shanghai`. PostgreSQL also sets `PGTZ=Asia/Shanghai`, and Grafana sets `GF_DATE_FORMATS_DEFAULT_TIMEZONE=Asia/Shanghai`.
+
 Pinned local stack images:
 
 - PostgreSQL with pgvector: `pgvector/pgvector:0.8.2-pg16-bookworm`
@@ -155,6 +157,23 @@ otel_metrics_endpoint: ""
 Docker Compose wires `otel_exporter_otlp_endpoint` to `http://otel-collector:4318`. The collector exposes application metrics to Prometheus and sends traces to Tempo through OTLP HTTP on `http://tempo:4318`. Grafana is provisioned with Prometheus and Tempo datasources.
 
 The local collector also has a `debug` trace exporter enabled. When the assistant emits spans, `docker compose logs otel-collector` should show exported trace batches. If collector logs show trace batches but Grafana has no results, the issue is between Collector, Tempo, and Grafana. If collector logs show no trace batches after assistant requests, the issue is between the assistant and Collector.
+
+Trace troubleshooting flow:
+
+```sh
+docker compose logs --tail=200 otel-collector
+docker compose logs --tail=200 tempo
+curl -sS http://localhost:3200/ready
+curl -G 'http://localhost:3200/api/search' --data-urlencode 'q={resource.service.name="personal-assistant"}'
+```
+
+If Collector debug logs include trace IDs, query one directly:
+
+```sh
+curl -sS http://localhost:3200/api/traces/<trace_id>
+```
+
+Prometheus also scrapes Tempo metrics. Use `tempo_distributor_spans_received_total` or related `tempo_*` series to confirm Tempo ingestion.
 
 ## HTTP API
 
