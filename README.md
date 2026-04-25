@@ -154,6 +154,8 @@ otel_metrics_endpoint: ""
 
 Docker Compose wires `otel_exporter_otlp_endpoint` to `http://otel-collector:4318`. The collector exposes application metrics to Prometheus and sends traces to Tempo through OTLP HTTP on `http://tempo:4318`. Grafana is provisioned with Prometheus and Tempo datasources.
 
+The local collector also has a `debug` trace exporter enabled. When the assistant emits spans, `docker compose logs otel-collector` should show exported trace batches. If collector logs show trace batches but Grafana has no results, the issue is between Collector, Tempo, and Grafana. If collector logs show no trace batches after assistant requests, the issue is between the assistant and Collector.
+
 ## HTTP API
 
 Create a session:
