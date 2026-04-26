@@ -13,7 +13,7 @@ Project rules for coding agents working in this repository.
 - Go 1.25+.
 - ADK-Go for agent runtime.
 - PostgreSQL for durable state.
-- pgvector for memory embeddings and vector search.
+- ParadeDB pg_search for BM25 and pgvector for memory embedding vector search.
 - Model providers: `echo`, `gemini`, and `glm`.
 - Cobra for CLI commands.
 - YAML for configuration.
@@ -66,11 +66,13 @@ Project rules for coding agents working in this repository.
 ## Session And Memory Rules
 
 - `internal/store.Store` implements both ADK `session.Service` and `memory.Service`.
+- IDs for sessions, events, memories, and memory chunks are database `bigint` values allocated by backend `store.IDAllocator` as microsecond timestamp IDs; ADK/API surfaces expose decimal strings.
+- `app_name` is `varchar(256)` and `user_id` is `varchar(50)` in storage. Validate those limits before store calls.
 - Session events are append-only in `session_events`.
 - Persistent session state lives in `sessions.state`.
 - Never persist ADK temporary state keys with prefix `temp:`.
 - Long-term memory lives in `memories` and `memory_chunks`.
-- RAG is hybrid PostgreSQL search: full-text search plus pgvector.
+- RAG is hybrid search: ParadeDB BM25 plus pgvector, fused with reciprocal rank fusion.
 - Keep `embedding_dimension` aligned with the `memory_chunks.embedding vector(1024)` schema unless a migration changes both.
 - `embedding_provider: hash` is local and deterministic. `embedding_provider: gemini` and `embedding_provider: bigmodel` are semantic production paths.
 - Keep user/app scoping on every session and memory query.

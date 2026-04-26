@@ -44,6 +44,14 @@ type errorBody struct {
 	Message string      `json:"message"`
 }
 
+type saveMemoryRequest struct {
+	UserID     string         `json:"user_id"`
+	Kind       string         `json:"kind"`
+	Content    string         `json:"content"`
+	Metadata   map[string]any `json:"metadata"`
+	Importance float64        `json:"importance"`
+}
+
 func New(appSvc *app.Service, store *store.Store, logger *slog.Logger) http.Handler {
 	server := &Server{
 		app:    appSvc,
@@ -98,6 +106,7 @@ func (s *Server) chat(w http.ResponseWriter, r *http.Request) {
 	if !decodeJSON(w, r, &req) {
 		return
 	}
+	normalizeChatRequest(&req)
 	resp, err := s.app.Chat(r.Context(), req)
 	if err != nil {
 		s.writeError(w, r, err)
@@ -111,6 +120,7 @@ func (s *Server) chatStream(w http.ResponseWriter, r *http.Request) {
 	if !decodeJSON(w, r, &req) {
 		return
 	}
+	normalizeChatRequest(&req)
 	flusher, ok := w.(http.Flusher)
 	if !ok {
 		s.writeError(w, r, apperr.New(apperr.CodeInternal, "streaming is unavailable"))
@@ -142,6 +152,7 @@ func (s *Server) createSession(w http.ResponseWriter, r *http.Request) {
 	if !decodeJSON(w, r, &req) {
 		return
 	}
+	normalizeCreateSessionRequest(&req)
 	resp, err := s.app.CreateSession(r.Context(), req)
 	if err != nil {
 		s.writeError(w, r, err)
@@ -151,7 +162,7 @@ func (s *Server) createSession(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) listSessions(w http.ResponseWriter, r *http.Request) {
-	userID := r.URL.Query().Get("user_id")
+	userID := strings.TrimSpace(r.URL.Query().Get("user_id"))
 	resp, err := s.app.ListSessions(r.Context(), userID)
 	if err != nil {
 		s.writeError(w, r, err)
@@ -161,7 +172,7 @@ func (s *Server) listSessions(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) getSession(w http.ResponseWriter, r *http.Request) {
-	resp, err := s.app.GetSession(r.Context(), r.URL.Query().Get("user_id"), r.PathValue("session_id"))
+	resp, err := s.app.GetSession(r.Context(), strings.TrimSpace(r.URL.Query().Get("user_id")), strings.TrimSpace(r.PathValue("session_id")))
 	if err != nil {
 		s.writeError(w, r, err)
 		return
@@ -170,7 +181,7 @@ func (s *Server) getSession(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) deleteSession(w http.ResponseWriter, r *http.Request) {
-	if err := s.app.DeleteSession(r.Context(), r.URL.Query().Get("user_id"), r.PathValue("session_id")); err != nil {
+	if err := s.app.DeleteSession(r.Context(), strings.TrimSpace(r.URL.Query().Get("user_id")), strings.TrimSpace(r.PathValue("session_id"))); err != nil {
 		s.writeError(w, r, err)
 		return
 	}
@@ -178,16 +189,11 @@ func (s *Server) deleteSession(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) saveMemory(w http.ResponseWriter, r *http.Request) {
-	var req struct {
-		UserID     string         `json:"user_id"`
-		Kind       string         `json:"kind"`
-		Content    string         `json:"content"`
-		Metadata   map[string]any `json:"metadata"`
-		Importance float64        `json:"importance"`
-	}
+	var req saveMemoryRequest
 	if !decodeJSON(w, r, &req) {
 		return
 	}
+	normalizeSaveMemoryRequest(&req)
 	resp, err := s.app.SaveMemory(r.Context(), store.MemoryRecord{
 		UserID:     req.UserID,
 		Kind:       req.Kind,
@@ -208,7 +214,7 @@ func (s *Server) searchMemory(w http.ResponseWriter, r *http.Request) {
 		s.writeError(w, r, apperr.New(apperr.CodeInvalid, "limit must be an integer"))
 		return
 	}
-	resp, err := s.app.SearchMemory(r.Context(), r.URL.Query().Get("user_id"), r.URL.Query().Get("q"), limit)
+	resp, err := s.app.SearchMemory(r.Context(), strings.TrimSpace(r.URL.Query().Get("user_id")), strings.TrimSpace(r.URL.Query().Get("q")), limit)
 	if err != nil {
 		s.writeError(w, r, err)
 		return
@@ -240,6 +246,24 @@ func decodeJSON(w http.ResponseWriter, r *http.Request, target any) bool {
 		return false
 	}
 	return true
+}
+
+func normalizeChatRequest(req *app.ChatRequest) {
+	req.UserID = strings.TrimSpace(req.UserID)
+	req.SessionID = strings.TrimSpace(req.SessionID)
+	req.Message = strings.TrimSpace(req.Message)
+}
+
+func normalizeCreateSessionRequest(req *app.CreateSessionRequest) {
+	req.UserID = strings.TrimSpace(req.UserID)
+	req.SessionID = strings.TrimSpace(req.SessionID)
+	req.Title = strings.TrimSpace(req.Title)
+}
+
+func normalizeSaveMemoryRequest(req *saveMemoryRequest) {
+	req.UserID = strings.TrimSpace(req.UserID)
+	req.Kind = strings.TrimSpace(req.Kind)
+	req.Content = strings.TrimSpace(req.Content)
 }
 
 func (s *Server) writeError(w http.ResponseWriter, r *http.Request, err error) {

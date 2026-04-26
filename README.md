@@ -8,7 +8,7 @@ First version of a small personal assistant service built with Go, ADK-Go, Postg
 - Durable ADK session storage in PostgreSQL.
 - Short-term memory through ADK session history plus a rolling session summary.
 - Long-term memory and RAG through PostgreSQL full-text search.
-- Hybrid RAG with PostgreSQL full-text search plus pgvector.
+- Hybrid RAG with ParadeDB BM25 plus pgvector.
 - Optional MCP stdio toolsets attached to the ADK LLM agent.
 - Structured logs with `log/slog`.
 - OpenTelemetry tracing and metrics for HTTP, database-facing flows, chat, memory, and RAG steps.
@@ -140,12 +140,14 @@ Compose uses pinned image tags and `config.compose.yaml`, which points `database
 
 All Compose services run with `TZ=Asia/Shanghai`. PostgreSQL also sets `PGTZ=Asia/Shanghai`, and Grafana sets `GF_DATE_FORMATS_DEFAULT_TIMEZONE=Asia/Shanghai`.
 
+The local database image is ParadeDB on PostgreSQL 17. If a previous local stack used a PostgreSQL 16 volume, recreate the `postgres-data` volume before starting Compose.
+
 Pinned local stack images:
 
-- PostgreSQL with pgvector: `pgvector/pgvector:0.8.2-pg16-bookworm`
-- OTel Collector Contrib: `otel/opentelemetry-collector-contrib:0.150.0`
+- ParadeDB with pg_search and pgvector: `paradedb/paradedb:0.23.1-pg17`
+- OTel Collector Contrib: `otel/opentelemetry-collector-contrib:0.150.1`
 - Prometheus: `prom/prometheus:v3.11.2-distroless`
-- Tempo: `grafana/tempo:2.8.3`
+- Tempo: `grafana/tempo:2.8.4`
 - Grafana: `grafana/grafana:13.0.1`
 
 Local service URLs:
@@ -216,6 +218,8 @@ curl -sS -X POST localhost:8080/v1/sessions \
   -H 'content-type: application/json' \
   -d '{"user_id":"me","title":"daily"}'
 ```
+
+Session, event, memory, and memory chunk IDs are stored as `bigint` microsecond timestamp IDs allocated by the backend. HTTP and ADK-facing APIs expose those IDs as decimal strings. `app_name` is limited to 256 characters and `user_id` is limited to 50 characters.
 
 Chat:
 

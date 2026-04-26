@@ -23,7 +23,9 @@ Sessions are durable PostgreSQL rows:
 - `session_events`: append-only ADK events as JSON plus extracted text for inspection.
 - `session_summaries`: rolling extractive summary for short-term compression.
 
-`PostgresSessionService.AppendEvent` persists every ADK event, strips `temp:` state keys, applies durable state deltas, and updates the session timestamp.
+Session and event IDs are stored as `bigint` microsecond timestamp IDs allocated by the backend. The ADK-facing session and event APIs still expose IDs as decimal strings. The allocator is isolated behind `store.IDAllocator` so it can later be moved behind a distributed ID service. `app_name` is stored as `varchar(256)` and `user_id` as `varchar(50)`.
+
+`PostgresSessionService.AppendEvent` skips ADK partial stream events, persists final/non-partial ADK events, strips `temp:` state keys, applies durable state deltas, and updates the session timestamp.
 
 ## Short-Term Memory
 
@@ -40,19 +42,19 @@ The summary is extractive in this first version. Replace `RefreshSummary` with a
 Long-term memory is stored in:
 
 - `memories`: memory record, kind, metadata, source event/session, importance.
-- `memory_chunks`: searchable chunks with generated PostgreSQL `tsvector` and `pgvector` embedding.
+- `memory_chunks`: searchable chunks with ParadeDB BM25 indexing and `pgvector` embedding.
 
-`PostgresMemoryService.AddSessionToMemory` stores textual session events as episodic memories, deduplicated by ADK event ID. The HTTP API and `memory_save` tool can also create explicit semantic memories.
+Memory and memory chunk IDs use the same backend-allocated `bigint` microsecond timestamp ID format. `PostgresMemoryService.AddSessionToMemory` stores textual session events as episodic memories, deduplicated by ADK event ID. The HTTP API and `memory_save` tool can also create explicit semantic memories.
 
 ## RAG
 
-RAG retrieval uses PostgreSQL hybrid search:
+RAG retrieval uses ParadeDB BM25 plus pgvector hybrid search:
 
 1. Embed the query with the configured embedding provider.
-2. Search user/app scoped memories using `websearch_to_tsquery`.
+2. Search user/app scoped memories using ParadeDB BM25 over `memory_chunks.content`.
 3. Search nearby memory chunks using `embedding <=> query_embedding`.
-4. Merge FTS and vector candidates.
-5. Rank by FTS score, vector score, importance, and recency.
+4. Merge BM25 and vector candidates with reciprocal rank fusion.
+5. Rank by RRF score, importance, vector score, BM25 score, and recency.
 6. Format the top results into `rag_context`.
 7. Pass `rag_context` with `runner.WithStateDelta`.
 

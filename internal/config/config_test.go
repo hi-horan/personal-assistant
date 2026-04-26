@@ -65,6 +65,18 @@ embedding_model: embedding-3
 	}
 }
 
+func TestLoadFileRejectsLongAppName(t *testing.T) {
+	path := writeConfigForTest(t, `
+app_name: "`+strings.Repeat("a", 257)+`"
+database_url: "postgres://user:pass@localhost:5432/db?sslmode=disable"
+`)
+
+	_, err := LoadFile(path)
+	if err == nil || !strings.Contains(err.Error(), "app_name must be at most 256 characters") {
+		t.Fatalf("LoadFile() error = %v, want app_name length error", err)
+	}
+}
+
 func TestLoadFileGLMProviderRequiresAPIKey(t *testing.T) {
 	path := writeConfigForTest(t, `
 model_provider: glm

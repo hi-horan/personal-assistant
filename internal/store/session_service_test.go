@@ -26,7 +26,7 @@ func TestAppendEventRejectsNilInputsBeforeDatabaseUse(t *testing.T) {
 func TestAppendEventIgnoresPartialEvents(t *testing.T) {
 	svc := &Store{tracer: noop.NewTracerProvider().Tracer("test")}
 	err := svc.AppendEvent(context.Background(), &Session{
-		IDVal:         "s1",
+		IDVal:         "1700000000000000",
 		AppNameVal:    "app",
 		UserIDVal:     "u1",
 		StateVal:      State{},

@@ -15,33 +15,37 @@ const summaryMaxChars = 4000
 func (s *Store) RefreshSummary(ctx context.Context, appName, userID, sessionID string) (string, error) {
 	ctx, span := s.tracer.Start(ctx, "session.RefreshSummary")
 	defer span.End()
+	sessionIDInt, err := parseID(sessionID, "session_id")
+	if err != nil {
+		return "", err
+	}
 
 	rows, err := s.pool.Query(ctx, `
-		SELECT seq, author, content_text
+		SELECT id, author, content_text
 		FROM session_events
 		WHERE session_id = $1 AND app_name = $2 AND user_id = $3 AND content_text <> ''
-		ORDER BY seq DESC
+		ORDER BY id DESC
 		LIMIT 24
-	`, sessionID, appName, userID)
+	`, sessionIDInt, appName, userID)
 	if err != nil {
 		return "", fmt.Errorf("query summary events: %w", err)
 	}
 	defer rows.Close()
 
 	type item struct {
-		seq    int64
+		id     int64
 		author string
 		text   string
 	}
 	reversed := []item{}
-	var maxSeq int64
+	var maxEventID int64
 	for rows.Next() {
 		var it item
-		if err := rows.Scan(&it.seq, &it.author, &it.text); err != nil {
+		if err := rows.Scan(&it.id, &it.author, &it.text); err != nil {
 			return "", fmt.Errorf("scan summary event: %w", err)
 		}
-		if it.seq > maxSeq {
-			maxSeq = it.seq
+		if it.id > maxEventID {
+			maxEventID = it.id
 		}
 		reversed = append(reversed, it)
 	}
@@ -62,11 +66,11 @@ func (s *Store) RefreshSummary(ctx context.Context, appName, userID, sessionID s
 	}
 	summary := trimString(strings.Join(lines, "\n"), summaryMaxChars)
 	_, err = s.pool.Exec(ctx, `
-		INSERT INTO session_summaries (session_id, app_name, user_id, summary, covered_until_seq, updated_at)
+		INSERT INTO session_summaries (session_id, app_name, user_id, summary, covered_until_event_id, updated_at)
 		VALUES ($1, $2, $3, $4, $5, now())
 		ON CONFLICT (session_id)
-		DO UPDATE SET summary = EXCLUDED.summary, covered_until_seq = EXCLUDED.covered_until_seq, updated_at = now()
-	`, sessionID, appName, userID, summary, maxSeq)
+		DO UPDATE SET summary = EXCLUDED.summary, covered_until_event_id = EXCLUDED.covered_until_event_id, updated_at = now()
+	`, sessionIDInt, appName, userID, summary, maxEventID)
 	if err != nil {
 		return "", fmt.Errorf("upsert session summary: %w", err)
 	}
@@ -77,13 +81,17 @@ func (s *Store) RefreshSummary(ctx context.Context, appName, userID, sessionID s
 func (s *Store) GetSummary(ctx context.Context, appName, userID, sessionID string) (string, error) {
 	ctx, span := s.tracer.Start(ctx, "session.GetSummary")
 	defer span.End()
+	sessionIDInt, err := parseID(sessionID, "session_id")
+	if err != nil {
+		return "", err
+	}
 
 	var summary string
-	err := s.pool.QueryRow(ctx, `
+	err = s.pool.QueryRow(ctx, `
 		SELECT summary
 		FROM session_summaries
 		WHERE session_id = $1 AND app_name = $2 AND user_id = $3
-	`, sessionID, appName, userID).Scan(&summary)
+	`, sessionIDInt, appName, userID).Scan(&summary)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return "", nil

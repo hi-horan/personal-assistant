@@ -27,6 +27,7 @@ type Store struct {
 	tracer   trace.Tracer
 	metrics  storeMetrics
 	embedder embedding.Provider
+	ids      IDAllocator
 }
 
 type storeMetrics struct {
@@ -62,6 +63,7 @@ func New(ctx context.Context, databaseURL string, logger *slog.Logger, embedder 
 		tracer:   otel.Tracer("personal-assistant/store"),
 		metrics:  metrics,
 		embedder: embedder,
+		ids:      NewMicrosecondIDAllocator(),
 	}, nil
 }
 

@@ -8,6 +8,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 
 	"gopkg.in/yaml.v3"
 )
@@ -107,6 +108,12 @@ func LoadFile(path string) (Config, error) {
 
 	if cfg.DatabaseURL == "" {
 		return Config{}, fmt.Errorf("database_url is required")
+	}
+	if cfg.AppName == "" {
+		return Config{}, fmt.Errorf("app_name is required")
+	}
+	if utf8.RuneCountInString(cfg.AppName) > 256 {
+		return Config{}, fmt.Errorf("app_name must be at most 256 characters")
 	}
 	if cfg.ModelProvider != "echo" && cfg.ModelProvider != "gemini" && cfg.ModelProvider != "glm" {
 		return Config{}, fmt.Errorf("model_provider must be echo, gemini, or glm")

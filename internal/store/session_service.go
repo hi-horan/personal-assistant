@@ -9,7 +9,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"go.opentelemetry.io/otel/attribute"
@@ -21,13 +20,11 @@ func (s *Store) Create(ctx context.Context, req *session.CreateRequest) (*sessio
 	ctx, span := s.tracer.Start(ctx, "session.Create")
 	defer span.End()
 
-	if strings.TrimSpace(req.AppName) == "" || strings.TrimSpace(req.UserID) == "" {
+	if req.AppName == "" || req.UserID == "" {
 		return nil, fmt.Errorf("app name and user id are required")
 	}
-	id := strings.TrimSpace(req.SessionID)
-	if id == "" {
-		id = uuid.NewString()
-	}
+	id := s.ids.NextID()
+	sessionID := formatID(id)
 	state := State{}
 	for key, value := range req.State {
 		if strings.HasPrefix(key, session.KeyPrefixTemp) {
@@ -48,14 +45,14 @@ func (s *Store) Create(ctx context.Context, req *session.CreateRequest) (*sessio
 	if err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
-			return nil, fmt.Errorf("session %q already exists: %w", id, err)
+			return nil, fmt.Errorf("session %q already exists: %w", sessionID, err)
 		}
 		return nil, fmt.Errorf("insert session: %w", err)
 	}
 
-	s.logger.InfoContext(ctx, "session created", slog.String("app", req.AppName), slog.String("user_id", req.UserID), slog.String("session_id", id))
+	s.logger.InfoContext(ctx, "session created", slog.String("app", req.AppName), slog.String("user_id", req.UserID), slog.String("session_id", sessionID))
 	return &session.CreateResponse{Session: &Session{
-		IDVal:         id,
+		IDVal:         sessionID,
 		AppNameVal:    req.AppName,
 		UserIDVal:     req.UserID,
 		StateVal:      state,
@@ -68,28 +65,34 @@ func (s *Store) Get(ctx context.Context, req *session.GetRequest) (*session.GetR
 	ctx, span := s.tracer.Start(ctx, "session.Get")
 	defer span.End()
 	span.SetAttributes(attribute.String("session.id", req.SessionID))
+	sessionID, err := parseID(req.SessionID, "session_id")
+	if err != nil {
+		return nil, err
+	}
 
 	row := s.pool.QueryRow(ctx, `
 		SELECT id, app_name, user_id, title, state, updated_at
 		FROM sessions
 		WHERE id = $1 AND app_name = $2 AND user_id = $3
-	`, req.SessionID, req.AppName, req.UserID)
+	`, sessionID, req.AppName, req.UserID)
 
 	var sess Session
+	var id int64
 	var stateRaw []byte
-	if err := row.Scan(&sess.IDVal, &sess.AppNameVal, &sess.UserIDVal, &sess.Title, &stateRaw, &sess.LastUpdateVal); err != nil {
+	if err := row.Scan(&id, &sess.AppNameVal, &sess.UserIDVal, &sess.Title, &stateRaw, &sess.LastUpdateVal); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, fmt.Errorf("session %q not found", req.SessionID)
 		}
 		return nil, fmt.Errorf("select session: %w", err)
 	}
+	sess.IDVal = formatID(id)
 	state, err := decodeState(stateRaw)
 	if err != nil {
 		return nil, err
 	}
 	sess.StateVal = state
 
-	events, err := s.loadEvents(ctx, req.SessionID, req.After, req.NumRecentEvents)
+	events, err := s.loadEvents(ctx, sessionID, req.After, req.NumRecentEvents)
 	if err != nil {
 		return nil, err
 	}
@@ -115,10 +118,12 @@ func (s *Store) List(ctx context.Context, req *session.ListRequest) (*session.Li
 	var sessions []session.Session
 	for rows.Next() {
 		var sess Session
+		var id int64
 		var stateRaw []byte
-		if err := rows.Scan(&sess.IDVal, &sess.AppNameVal, &sess.UserIDVal, &sess.Title, &stateRaw, &sess.LastUpdateVal); err != nil {
+		if err := rows.Scan(&id, &sess.AppNameVal, &sess.UserIDVal, &sess.Title, &stateRaw, &sess.LastUpdateVal); err != nil {
 			return nil, fmt.Errorf("scan session: %w", err)
 		}
+		sess.IDVal = formatID(id)
 		state, err := decodeState(stateRaw)
 		if err != nil {
 			return nil, err
@@ -136,11 +141,15 @@ func (s *Store) List(ctx context.Context, req *session.ListRequest) (*session.Li
 func (s *Store) Delete(ctx context.Context, req *session.DeleteRequest) error {
 	ctx, span := s.tracer.Start(ctx, "session.Delete")
 	defer span.End()
+	sessionID, err := parseID(req.SessionID, "session_id")
+	if err != nil {
+		return err
+	}
 
 	tag, err := s.pool.Exec(ctx, `
 		DELETE FROM sessions
 		WHERE id = $1 AND app_name = $2 AND user_id = $3
-	`, req.SessionID, req.AppName, req.UserID)
+	`, sessionID, req.AppName, req.UserID)
 	if err != nil {
 		return fmt.Errorf("delete session: %w", err)
 	}
@@ -154,12 +163,16 @@ func (s *Store) Delete(ctx context.Context, req *session.DeleteRequest) error {
 func (s *Store) UpdateSessionTitle(ctx context.Context, appName, userID, sessionID, title string) error {
 	ctx, span := s.tracer.Start(ctx, "session.UpdateSessionTitle")
 	defer span.End()
+	sessionIDInt, err := parseID(sessionID, "session_id")
+	if err != nil {
+		return err
+	}
 
-	_, err := s.pool.Exec(ctx, `
+	_, err = s.pool.Exec(ctx, `
 		UPDATE sessions
 		SET title = $4, updated_at = now()
 		WHERE id = $1 AND app_name = $2 AND user_id = $3
-	`, sessionID, appName, userID, strings.TrimSpace(title))
+	`, sessionIDInt, appName, userID, title)
 	if err != nil {
 		return fmt.Errorf("update session title: %w", err)
 	}
@@ -179,9 +192,12 @@ func (s *Store) AppendEvent(ctx context.Context, sess session.Session, event *se
 	if event.Partial {
 		return nil
 	}
-	if event.ID == "" {
-		event.ID = uuid.NewString()
+	sessionID, err := parseID(sess.ID(), "session_id")
+	if err != nil {
+		return err
 	}
+	eventID := s.ids.NextID()
+	event.ID = formatID(eventID)
 	if event.Timestamp.IsZero() {
 		event.Timestamp = time.Now().UTC()
 	}
@@ -203,7 +219,7 @@ func (s *Store) AppendEvent(ctx context.Context, sess session.Session, event *se
 		FROM sessions
 		WHERE id = $1 AND app_name = $2 AND user_id = $3
 		FOR UPDATE
-	`, sess.ID(), sess.AppName(), sess.UserID()).Scan(&stateRaw)
+	`, sessionID, sess.AppName(), sess.UserID()).Scan(&stateRaw)
 	if err != nil {
 		return fmt.Errorf("lock session for append: %w", err)
 	}
@@ -229,7 +245,7 @@ func (s *Store) AppendEvent(ctx context.Context, sess session.Session, event *se
 			(id, session_id, app_name, user_id, invocation_id, author, branch, content_text, event_json, created_at)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 		ON CONFLICT (id) DO NOTHING
-	`, event.ID, sess.ID(), sess.AppName(), sess.UserID(), event.InvocationID, event.Author, event.Branch, text, eventJSON, event.Timestamp)
+	`, eventID, sessionID, sess.AppName(), sess.UserID(), event.InvocationID, event.Author, event.Branch, text, eventJSON, event.Timestamp)
 	if err != nil {
 		return fmt.Errorf("insert session event: %w", err)
 	}
@@ -238,7 +254,7 @@ func (s *Store) AppendEvent(ctx context.Context, sess session.Session, event *se
 		UPDATE sessions
 		SET state = $4, updated_at = $5
 		WHERE id = $1 AND app_name = $2 AND user_id = $3
-	`, sess.ID(), sess.AppName(), sess.UserID(), stateJSON, event.Timestamp)
+	`, sessionID, sess.AppName(), sess.UserID(), stateJSON, event.Timestamp)
 	if err != nil {
 		return fmt.Errorf("update session after append: %w", err)
 	}
@@ -251,7 +267,7 @@ func (s *Store) AppendEvent(ctx context.Context, sess session.Session, event *se
 	return nil
 }
 
-func (s *Store) loadEvents(ctx context.Context, sessionID string, after time.Time, limit int) (Events, error) {
+func (s *Store) loadEvents(ctx context.Context, sessionID int64, after time.Time, limit int) (Events, error) {
 	args := []any{sessionID}
 	filter := "WHERE session_id = $1"
 	if !after.IsZero() {
@@ -265,20 +281,20 @@ func (s *Store) loadEvents(ctx context.Context, sessionID string, after time.Tim
 		query = fmt.Sprintf(`
 			SELECT event_json
 			FROM (
-				SELECT seq, event_json
+				SELECT id, event_json
 				FROM session_events
 				%s
-				ORDER BY seq DESC
+				ORDER BY id DESC
 				LIMIT $%d
 			) recent
-			ORDER BY seq ASC
+			ORDER BY id ASC
 		`, filter, len(args))
 	} else {
 		query = fmt.Sprintf(`
 			SELECT event_json
 			FROM session_events
 			%s
-			ORDER BY seq ASC
+			ORDER BY id ASC
 		`, filter)
 	}
 

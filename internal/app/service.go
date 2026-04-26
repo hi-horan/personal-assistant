@@ -171,11 +171,9 @@ func (s *Service) Chat(ctx context.Context, req ChatRequest) (ChatResponse, erro
 		}
 	}()
 
-	req.UserID = strings.TrimSpace(req.UserID)
-	req.Message = strings.TrimSpace(req.Message)
-	if req.UserID == "" {
+	if err := validateScope(s.cfg.AppName, req.UserID); err != nil {
 		status = "invalid"
-		return ChatResponse{}, apperr.New(apperr.CodeInvalid, "user_id is required")
+		return ChatResponse{}, err
 	}
 	if req.Message == "" {
 		status = "invalid"
@@ -196,7 +194,7 @@ func (s *Service) Chat(ctx context.Context, req ChatRequest) (ChatResponse, erro
 	s.logger.InfoContext(ctx, "chat started", slog.String("user_id", req.UserID), slog.String("session_id", sessionID), slog.Bool("new_session", created), slog.Int("memory_hits", len(ragResult.Memories)))
 	events := []EventView{}
 	answer := ""
-	seq := s.runner.Run(
+	runEvents := s.runner.Run(
 		ctx,
 		req.UserID,
 		sessionID,
@@ -206,7 +204,7 @@ func (s *Service) Chat(ctx context.Context, req ChatRequest) (ChatResponse, erro
 			"rag_context": ragResult.Context,
 		}),
 	)
-	for event, runErr := range seq {
+	for event, runErr := range runEvents {
 		if runErr != nil {
 			status = "runner_error"
 			s.logger.ErrorContext(ctx, "chat run failed", slog.String("user_id", req.UserID), slog.String("session_id", sessionID), slog.Any("error", runErr))
@@ -269,11 +267,9 @@ func (s *Service) ChatStream(ctx context.Context, req ChatRequest, emit func(Cha
 		}
 	}()
 
-	req.UserID = strings.TrimSpace(req.UserID)
-	req.Message = strings.TrimSpace(req.Message)
-	if req.UserID == "" {
+	if err := validateScope(s.cfg.AppName, req.UserID); err != nil {
 		status = "invalid"
-		return apperr.New(apperr.CodeInvalid, "user_id is required")
+		return err
 	}
 	if req.Message == "" {
 		status = "invalid"
@@ -299,7 +295,7 @@ func (s *Service) ChatStream(ctx context.Context, req ChatRequest, emit func(Cha
 	events := []EventView{}
 	answer := ""
 	prevPartial := ""
-	seq := s.runner.Run(
+	runEvents := s.runner.Run(
 		ctx,
 		req.UserID,
 		sessionID,
@@ -309,7 +305,7 @@ func (s *Service) ChatStream(ctx context.Context, req ChatRequest, emit func(Cha
 			"rag_context": ragResult.Context,
 		}),
 	)
-	for event, runErr := range seq {
+	for event, runErr := range runEvents {
 		if runErr != nil {
 			status = "runner_error"
 			s.logger.ErrorContext(ctx, "chat stream run failed", slog.String("user_id", req.UserID), slog.String("session_id", sessionID), slog.Any("error", runErr))
@@ -402,21 +398,19 @@ func newServiceMetrics() (serviceMetrics, error) {
 }
 
 func (s *Service) CreateSession(ctx context.Context, req CreateSessionRequest) (SessionView, error) {
-	req.UserID = strings.TrimSpace(req.UserID)
-	if req.UserID == "" {
-		return SessionView{}, apperr.New(apperr.CodeInvalid, "user_id is required")
+	if err := validateScope(s.cfg.AppName, req.UserID); err != nil {
+		return SessionView{}, err
 	}
 	resp, err := s.store.Create(ctx, &session.CreateRequest{
-		AppName:   s.cfg.AppName,
-		UserID:    req.UserID,
-		SessionID: strings.TrimSpace(req.SessionID),
-		State:     req.State,
+		AppName: s.cfg.AppName,
+		UserID:  req.UserID,
+		State:   req.State,
 	})
 	if err != nil {
 		return SessionView{}, apperr.Wrap(apperr.CodeConflict, "create session", err)
 	}
-	if title := strings.TrimSpace(req.Title); title != "" {
-		if err := s.store.UpdateSessionTitle(ctx, s.cfg.AppName, req.UserID, resp.Session.ID(), title); err != nil {
+	if req.Title != "" {
+		if err := s.store.UpdateSessionTitle(ctx, s.cfg.AppName, req.UserID, resp.Session.ID(), req.Title); err != nil {
 			return SessionView{}, apperr.Wrap(apperr.CodeInternal, "update session title", err)
 		}
 	}
@@ -424,9 +418,8 @@ func (s *Service) CreateSession(ctx context.Context, req CreateSessionRequest) (
 }
 
 func (s *Service) ListSessions(ctx context.Context, userID string) ([]SessionView, error) {
-	userID = strings.TrimSpace(userID)
-	if userID == "" {
-		return nil, apperr.New(apperr.CodeInvalid, "user_id is required")
+	if err := validateScope(s.cfg.AppName, userID); err != nil {
+		return nil, err
 	}
 	resp, err := s.store.List(ctx, &session.ListRequest{AppName: s.cfg.AppName, UserID: userID})
 	if err != nil {
@@ -440,7 +433,10 @@ func (s *Service) ListSessions(ctx context.Context, userID string) ([]SessionVie
 }
 
 func (s *Service) GetSession(ctx context.Context, userID, sessionID string) (SessionView, error) {
-	if strings.TrimSpace(userID) == "" || strings.TrimSpace(sessionID) == "" {
+	if err := validateScope(s.cfg.AppName, userID); err != nil {
+		return SessionView{}, err
+	}
+	if sessionID == "" {
 		return SessionView{}, apperr.New(apperr.CodeInvalid, "user_id and session_id are required")
 	}
 	resp, err := s.store.Get(ctx, &session.GetRequest{
@@ -455,7 +451,10 @@ func (s *Service) GetSession(ctx context.Context, userID, sessionID string) (Ses
 }
 
 func (s *Service) DeleteSession(ctx context.Context, userID, sessionID string) error {
-	if strings.TrimSpace(userID) == "" || strings.TrimSpace(sessionID) == "" {
+	if err := validateScope(s.cfg.AppName, userID); err != nil {
+		return err
+	}
+	if sessionID == "" {
 		return apperr.New(apperr.CodeInvalid, "user_id and session_id are required")
 	}
 	if err := s.store.Delete(ctx, &session.DeleteRequest{
@@ -470,9 +469,10 @@ func (s *Service) DeleteSession(ctx context.Context, userID, sessionID string) e
 
 func (s *Service) SaveMemory(ctx context.Context, rec store.MemoryRecord) (store.MemoryResult, error) {
 	rec.AppName = s.cfg.AppName
-	rec.UserID = strings.TrimSpace(rec.UserID)
-	rec.Content = strings.TrimSpace(rec.Content)
-	if rec.UserID == "" || rec.Content == "" {
+	if err := validateScope(s.cfg.AppName, rec.UserID); err != nil {
+		return store.MemoryResult{}, err
+	}
+	if rec.Content == "" {
 		return store.MemoryResult{}, apperr.New(apperr.CodeInvalid, "user_id and content are required")
 	}
 	if rec.Kind == "" {
@@ -502,9 +502,8 @@ func (s *Service) SaveMemory(ctx context.Context, rec store.MemoryRecord) (store
 }
 
 func (s *Service) SearchMemory(ctx context.Context, userID, query string, limit int) ([]store.MemoryResult, error) {
-	userID = strings.TrimSpace(userID)
-	if userID == "" {
-		return nil, apperr.New(apperr.CodeInvalid, "user_id is required")
+	if err := validateScope(s.cfg.AppName, userID); err != nil {
+		return nil, err
 	}
 	results, err := s.store.SearchMemories(ctx, s.cfg.AppName, userID, query, limit)
 	if err != nil {
@@ -514,7 +513,6 @@ func (s *Service) SearchMemory(ctx context.Context, userID, query string, limit 
 }
 
 func (s *Service) ensureSession(ctx context.Context, userID, sessionID, title string) (string, bool, error) {
-	sessionID = strings.TrimSpace(sessionID)
 	if sessionID != "" {
 		if _, err := s.store.Get(ctx, &session.GetRequest{AppName: s.cfg.AppName, UserID: userID, SessionID: sessionID}); err != nil {
 			return "", false, apperr.Wrap(apperr.CodeNotFound, "session not found", err)
@@ -547,11 +545,10 @@ Memory context:
 }
 
 func titleFromMessage(message string) string {
-	message = strings.TrimSpace(message)
 	if len(message) <= 64 {
 		return message
 	}
-	return strings.TrimSpace(message[:61]) + "..."
+	return message[:61] + "..."
 }
 
 func sessionView(sess session.Session, includeEvents bool) SessionView {
