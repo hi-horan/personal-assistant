@@ -12,7 +12,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-const DefaultEmbeddingDimension = 768
+const DefaultEmbeddingDimension = 1024
 
 type Config struct {
 	HTTPAddr            string     `yaml:"http_addr"`
@@ -28,6 +28,8 @@ type Config struct {
 	GLMAPIKey           string     `yaml:"glm_api_key"`
 	GLMBaseURL          string     `yaml:"glm_base_url"`
 	GLMThinkingType     string     `yaml:"glm_thinking_type"`
+	BigModelAPIKey      string     `yaml:"bigmodel_api_key"`
+	BigModelBaseURL     string     `yaml:"bigmodel_base_url"`
 	EmbeddingProvider   string     `yaml:"embedding_provider"`
 	EmbeddingModel      string     `yaml:"embedding_model"`
 	EmbeddingDimension  int        `yaml:"embedding_dimension"`
@@ -65,6 +67,7 @@ func LoadFile(path string) (Config, error) {
 		GeminiModel:        "gemini-2.5-flash",
 		GLMModel:           "glm-4.6v",
 		GLMBaseURL:         "https://open.bigmodel.cn/api/paas/v4",
+		BigModelBaseURL:    "https://open.bigmodel.cn/api/paas/v4",
 		EmbeddingProvider:  "hash",
 		EmbeddingModel:     "text-embedding-004",
 		EmbeddingDimension: DefaultEmbeddingDimension,
@@ -74,6 +77,10 @@ func LoadFile(path string) (Config, error) {
 	decoder.KnownFields(true)
 	if err := decoder.Decode(&cfg); err != nil {
 		return Config{}, fmt.Errorf("parse config %q: %w", path, err)
+	}
+	var extra any
+	if err := decoder.Decode(&extra); err != io.EOF {
+		return Config{}, fmt.Errorf("parse config %q: multiple YAML documents are not supported", path)
 	}
 	cfg.LogLevelText = normalizeLogLevelText(cfg.LogLevelText)
 	cfg.LogLevel = parseLogLevel(cfg.LogLevelText)
@@ -88,6 +95,8 @@ func LoadFile(path string) (Config, error) {
 	cfg.GLMAPIKey = strings.TrimSpace(cfg.GLMAPIKey)
 	cfg.GLMBaseURL = strings.TrimRight(strings.TrimSpace(cfg.GLMBaseURL), "/")
 	cfg.GLMThinkingType = strings.ToLower(strings.TrimSpace(cfg.GLMThinkingType))
+	cfg.BigModelAPIKey = strings.TrimSpace(cfg.BigModelAPIKey)
+	cfg.BigModelBaseURL = strings.TrimRight(strings.TrimSpace(cfg.BigModelBaseURL), "/")
 	cfg.EmbeddingModel = strings.TrimSpace(cfg.EmbeddingModel)
 	cfg.OTelServiceName = strings.TrimSpace(cfg.OTelServiceName)
 	cfg.OTelEndpoint = strings.TrimSpace(cfg.OTelEndpoint)
@@ -117,11 +126,17 @@ func LoadFile(path string) (Config, error) {
 	if cfg.GLMThinkingType != "" && cfg.GLMThinkingType != "enabled" && cfg.GLMThinkingType != "disabled" {
 		return Config{}, fmt.Errorf("glm_thinking_type must be empty, enabled, or disabled")
 	}
-	if cfg.EmbeddingProvider != "hash" && cfg.EmbeddingProvider != "gemini" {
-		return Config{}, fmt.Errorf("embedding_provider must be hash or gemini")
+	if cfg.EmbeddingProvider != "hash" && cfg.EmbeddingProvider != "gemini" && cfg.EmbeddingProvider != "bigmodel" {
+		return Config{}, fmt.Errorf("embedding_provider must be hash, gemini, or bigmodel")
 	}
 	if cfg.EmbeddingProvider == "gemini" && cfg.GeminiAPIKey == "" {
 		return Config{}, fmt.Errorf("gemini_api_key is required when embedding_provider is gemini")
+	}
+	if cfg.EmbeddingProvider == "bigmodel" && cfg.BigModelAPIKey == "" {
+		return Config{}, fmt.Errorf("bigmodel_api_key is required when embedding_provider is bigmodel")
+	}
+	if cfg.EmbeddingProvider == "bigmodel" && cfg.BigModelBaseURL == "" {
+		return Config{}, fmt.Errorf("bigmodel_base_url is required when embedding_provider is bigmodel")
 	}
 	if cfg.EmbeddingDimension != DefaultEmbeddingDimension {
 		return Config{}, fmt.Errorf("embedding_dimension must be %s for the current pgvector schema", strconv.Itoa(DefaultEmbeddingDimension))

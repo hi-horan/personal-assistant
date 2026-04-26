@@ -64,14 +64,33 @@ func TestGLMChatRequestConvertsADKRequest(t *testing.T) {
 }
 
 func TestDecodeGLMStreamChunk(t *testing.T) {
-	chunk, err := decodeGLMStreamChunk(`{"model":"glm-4.6v","choices":[{"delta":{"content":"hello"}}]}`)
+	chunk, err := decodeGLMStreamChunk(`{"model":"glm-4.6v","choices":[{"delta":{"content":" hello"}}]}`)
 	if err != nil {
 		t.Fatalf("decodeGLMStreamChunk() error = %v", err)
 	}
 	if got, want := chunk.Model, "glm-4.6v"; got != want {
 		t.Fatalf("Model = %q, want %q", got, want)
 	}
-	if got, want := chunk.text(), "hello"; got != want {
+	if got, want := chunk.text(), " hello"; got != want {
 		t.Fatalf("text() = %q, want %q", got, want)
+	}
+}
+
+func TestYieldFinalStreamResponsePreservesWhitespace(t *testing.T) {
+	llm := &GLMModel{}
+	var got *model.LLMResponse
+	llm.yieldFinalStreamResponse(func(resp *model.LLMResponse, err error) bool {
+		if err != nil {
+			t.Fatalf("yieldFinalStreamResponse() error = %v", err)
+		}
+		got = resp
+		return true
+	}, " hello world ", "glm-4.6v")
+
+	if got == nil || got.Content == nil || len(got.Content.Parts) != 1 {
+		t.Fatalf("response content = %#v, want one text part", got)
+	}
+	if got.Content.Parts[0].Text != " hello world " {
+		t.Fatalf("final text = %q, want preserved whitespace", got.Content.Parts[0].Text)
 	}
 }

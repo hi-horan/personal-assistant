@@ -1,12 +1,16 @@
 package embedding
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/binary"
+	"encoding/json"
 	"fmt"
-	"math"
+	"io"
+	"net/http"
 	"strings"
+	"time"
 
 	"personal-assistant/internal/config"
 
@@ -30,6 +34,8 @@ func New(ctx context.Context, cfg config.Config) (Provider, error) {
 		return NewHashProvider(cfg.EmbeddingDimension), nil
 	case "gemini":
 		return NewGeminiProvider(ctx, cfg)
+	case "bigmodel":
+		return NewBigModelProvider(cfg), nil
 	default:
 		return nil, fmt.Errorf("unsupported embedding_provider %q", cfg.EmbeddingProvider)
 	}
@@ -65,7 +71,6 @@ func (p *HashProvider) Embed(_ context.Context, text, _ string) ([]float32, erro
 		}
 		vec[idx] += sign
 	}
-	normalize(vec)
 	return vec, nil
 }
 
@@ -114,20 +119,93 @@ func (p *GeminiProvider) Embed(ctx context.Context, text, taskType string) ([]fl
 	if len(vec) != p.dimension {
 		return nil, fmt.Errorf("embedding dimension mismatch: got %d, want %d", len(vec), p.dimension)
 	}
-	normalize(vec)
 	return vec, nil
 }
 
-func normalize(vec []float32) {
-	var sum float64
-	for _, value := range vec {
-		sum += float64(value * value)
+type BigModelProvider struct {
+	client    *http.Client
+	model     string
+	apiKey    string
+	baseURL   string
+	dimension int
+}
+
+func NewBigModelProvider(cfg config.Config) *BigModelProvider {
+	return &BigModelProvider{
+		client:    &http.Client{Timeout: 60 * time.Second},
+		model:     cfg.EmbeddingModel,
+		apiKey:    cfg.BigModelAPIKey,
+		baseURL:   strings.TrimRight(cfg.BigModelBaseURL, "/"),
+		dimension: cfg.EmbeddingDimension,
 	}
-	if sum == 0 {
-		return
+}
+
+func (p *BigModelProvider) Name() string {
+	return "bigmodel"
+}
+
+func (p *BigModelProvider) Dimension() int {
+	return p.dimension
+}
+
+func (p *BigModelProvider) Embed(ctx context.Context, text, _ string) ([]float32, error) {
+	payload := bigModelEmbeddingRequest{
+		Model:      p.model,
+		Input:      text,
+		Dimensions: p.dimension,
 	}
-	scale := float32(1 / math.Sqrt(sum))
-	for i := range vec {
-		vec[i] *= scale
+	body, err := json.Marshal(payload)
+	if err != nil {
+		return nil, fmt.Errorf("marshal bigmodel embedding request: %w", err)
 	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, p.baseURL+"/embeddings", bytes.NewReader(body))
+	if err != nil {
+		return nil, fmt.Errorf("create bigmodel embedding request: %w", err)
+	}
+	req.Header.Set("authorization", "Bearer "+p.apiKey)
+	req.Header.Set("content-type", "application/json")
+	req.Header.Set("accept", "application/json")
+
+	resp, err := p.client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("call bigmodel embeddings: %w", err)
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(io.LimitReader(resp.Body, 4<<20))
+	if err != nil {
+		return nil, fmt.Errorf("read bigmodel embedding response: %w", err)
+	}
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return nil, fmt.Errorf("bigmodel embeddings failed: status=%d body=%s", resp.StatusCode, strings.TrimSpace(string(respBody)))
+	}
+
+	var decoded bigModelEmbeddingResponse
+	if err := json.Unmarshal(respBody, &decoded); err != nil {
+		return nil, fmt.Errorf("decode bigmodel embedding response: %w", err)
+	}
+	if len(decoded.Data) == 0 || len(decoded.Data[0].Embedding) == 0 {
+		return nil, fmt.Errorf("bigmodel embedding response returned no values")
+	}
+	vec := append([]float32(nil), decoded.Data[0].Embedding...)
+	if len(vec) != p.dimension {
+		return nil, fmt.Errorf("embedding dimension mismatch: got %d, want %d", len(vec), p.dimension)
+	}
+	return vec, nil
+}
+
+type bigModelEmbeddingRequest struct {
+	Model      string `json:"model"`
+	Input      string `json:"input"`
+	Dimensions int    `json:"dimensions"`
+}
+
+type bigModelEmbeddingResponse struct {
+	Model string                  `json:"model"`
+	Data  []bigModelEmbeddingData `json:"data"`
+}
+
+type bigModelEmbeddingData struct {
+	Index     int       `json:"index"`
+	Embedding []float32 `json:"embedding"`
 }

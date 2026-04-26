@@ -170,6 +170,15 @@ func (s *Store) AppendEvent(ctx context.Context, sess session.Session, event *se
 	ctx, span := s.tracer.Start(ctx, "session.AppendEvent")
 	defer span.End()
 
+	if sess == nil {
+		return fmt.Errorf("session is nil")
+	}
+	if event == nil {
+		return fmt.Errorf("event is nil")
+	}
+	if event.Partial {
+		return nil
+	}
 	if event.ID == "" {
 		event.ID = uuid.NewString()
 	}

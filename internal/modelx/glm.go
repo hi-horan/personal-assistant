@@ -201,8 +201,7 @@ func (m *GLMModel) generateStream(ctx context.Context, req *model.LLMRequest, yi
 }
 
 func (m *GLMModel) yieldFinalStreamResponse(yield func(*model.LLMResponse, error) bool, text, modelVersion string) {
-	text = strings.TrimSpace(text)
-	if text == "" {
+	if strings.TrimSpace(text) == "" {
 		yield(nil, fmt.Errorf("glm stream response had no content"))
 		return
 	}
@@ -361,7 +360,7 @@ func (c glmStreamChunk) text() string {
 	if len(c.Choices) == 0 {
 		return ""
 	}
-	return strings.TrimSpace(c.Choices[0].Delta.Content)
+	return c.Choices[0].Delta.Content
 }
 
 type glmStreamChoice struct {

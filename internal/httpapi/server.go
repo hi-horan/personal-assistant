@@ -5,7 +5,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
+	"mime"
 	"net/http"
 	"strconv"
 	"strings"
@@ -215,7 +217,8 @@ func (s *Server) searchMemory(w http.ResponseWriter, r *http.Request) {
 }
 
 func decodeJSON(w http.ResponseWriter, r *http.Request, target any) bool {
-	if !strings.HasPrefix(r.Header.Get("content-type"), "application/json") {
+	mediaType, _, err := mime.ParseMediaType(r.Header.Get("content-type"))
+	if err != nil || mediaType != "application/json" {
 		writeJSON(w, http.StatusUnsupportedMediaType, errorResponse{
 			Error: errorBody{Code: apperr.CodeInvalid, Message: "content-type must be application/json"},
 		})
@@ -224,6 +227,13 @@ func decodeJSON(w http.ResponseWriter, r *http.Request, target any) bool {
 	decoder := json.NewDecoder(r.Body)
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(target); err != nil {
+		writeJSON(w, http.StatusBadRequest, errorResponse{
+			Error: errorBody{Code: apperr.CodeInvalid, Message: "invalid JSON body"},
+		})
+		return false
+	}
+	var extra any
+	if err := decoder.Decode(&extra); err != io.EOF {
 		writeJSON(w, http.StatusBadRequest, errorResponse{
 			Error: errorBody{Code: apperr.CodeInvalid, Message: "invalid JSON body"},
 		})

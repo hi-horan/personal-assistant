@@ -70,13 +70,13 @@ CREATE TABLE IF NOT EXISTS memory_chunks (
   user_id text NOT NULL,
   content text NOT NULL,
   metadata jsonb NOT NULL DEFAULT '{}'::jsonb,
-  embedding vector(768),
+  embedding vector(1024),
   tsv tsvector GENERATED ALWAYS AS (to_tsvector('simple', content)) STORED,
   created_at timestamptz NOT NULL DEFAULT now()
 );
 
 ALTER TABLE memory_chunks
-  ADD COLUMN IF NOT EXISTS embedding vector(768);
+  ADD COLUMN IF NOT EXISTS embedding vector(1024);
 
 CREATE INDEX IF NOT EXISTS memory_chunks_tsv_idx
   ON memory_chunks USING gin (tsv);

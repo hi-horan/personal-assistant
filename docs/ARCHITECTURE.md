@@ -11,7 +11,7 @@ The service uses ADK-Go as the agent runtime:
 - `memory.Service` is implemented by `internal/store.PostgresMemoryService`.
 - The root `llmagent` receives a user message, ADK-managed conversation history, RAG context, memory tools, and optional MCP tools.
 - Model providers are selected by YAML: `echo` for local wiring, `gemini` through ADK-Go's Gemini adapter, and `glm` through the OpenAI-compatible GLM chat completions adapter.
-- Embeddings are provided by `internal/embedding`, with local hash embeddings for development and Gemini embeddings for semantic production retrieval.
+- Embeddings are provided by `internal/embedding`, with local hash embeddings for development and Gemini or BigModel Embedding-3 embeddings for semantic production retrieval.
 
 The first version has one root assistant agent. There are no sub-agents.
 
@@ -56,7 +56,7 @@ RAG retrieval uses PostgreSQL hybrid search:
 6. Format the top results into `rag_context`.
 7. Pass `rag_context` with `runner.WithStateDelta`.
 
-The default `hash` embedding provider is deterministic and local, intended for development and pipeline testing. Use `embedding_provider: gemini` for semantic vector search.
+The default `hash` embedding provider is deterministic and local, intended for development and pipeline testing. Use `embedding_provider: gemini` or `embedding_provider: bigmodel` for semantic vector search. The current pgvector schema is fixed at 1024 dimensions, so BigModel requests include `dimensions: 1024`. Embeddings are stored and queried without Go-side normalization; pgvector cosine distance (`<=>`) handles vector length during similarity calculation.
 
 ## MCP
 

@@ -598,5 +598,5 @@ func contentText(content *genai.Content) string {
 			parts = append(parts, part.Text)
 		}
 	}
-	return strings.TrimSpace(strings.Join(parts, "\n"))
+	return strings.Join(parts, "\n")
 }

@@ -8,16 +8,20 @@ log_level: info
 model_provider: echo
 gemini_model: gemini-2.5-flash
 gemini_api_key: ""
+
 glm_model: glm-4.6v
 glm_api_key: ""
 glm_base_url: "https://open.bigmodel.cn/api/paas/v4"
 # Optional: enabled or disabled. Empty omits the provider-specific thinking field.
 glm_thinking_type: ""
 
-# hash is local and deterministic. Use gemini for semantic embeddings in production.
-embedding_provider: hash
-embedding_model: text-embedding-004
-embedding_dimension: 768
+bigmodel_api_key: ""
+bigmodel_base_url: "https://open.bigmodel.cn/api/paas/v4"
+
+# hash is local and deterministic. Use gemini or bigmodel for semantic embeddings in production.
+embedding_provider: bigmodel
+embedding_model: embedding-3
+embedding_dimension: 1024
 
 # Optional OpenTelemetry OTLP HTTP endpoint, for example http://localhost:4318
 otel_service_name: personal-assistant

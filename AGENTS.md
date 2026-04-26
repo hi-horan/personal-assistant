@@ -71,8 +71,8 @@ Project rules for coding agents working in this repository.
 - Never persist ADK temporary state keys with prefix `temp:`.
 - Long-term memory lives in `memories` and `memory_chunks`.
 - RAG is hybrid PostgreSQL search: full-text search plus pgvector.
-- Keep `embedding_dimension` aligned with the `memory_chunks.embedding vector(768)` schema unless a migration changes both.
-- `embedding_provider: hash` is local and deterministic. `embedding_provider: gemini` is the semantic production path.
+- Keep `embedding_dimension` aligned with the `memory_chunks.embedding vector(1024)` schema unless a migration changes both.
+- `embedding_provider: hash` is local and deterministic. `embedding_provider: gemini` and `embedding_provider: bigmodel` are semantic production paths.
 - Keep user/app scoping on every session and memory query.
 
 ## MCP Rules

@@ -156,17 +156,14 @@ button.secondary,
 }
 
 .message {
-  max-width: 860px;
+  width: 100%;
   margin: 0 0 16px;
   display: grid;
   gap: 6px;
 }
 
-.message.user {
-  margin-left: auto;
-}
-
 .bubble {
+  width: 100%;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--panel);

@@ -65,7 +65,7 @@ Embeddings default to local deterministic hashing so the vector pipeline works w
 ```yaml
 embedding_provider: hash
 embedding_model: text-embedding-004
-embedding_dimension: 768
+embedding_dimension: 1024
 ```
 
 For semantic vector search in production, use Gemini embeddings:
@@ -75,6 +75,19 @@ embedding_provider: gemini
 embedding_model: text-embedding-004
 gemini_api_key: "..."
 ```
+
+Or use BigModel Embedding-3:
+
+```yaml
+embedding_provider: bigmodel
+embedding_model: embedding-3
+embedding_dimension: 1024
+bigmodel_api_key: "..."
+bigmodel_base_url: "https://open.bigmodel.cn/api/paas/v4"
+```
+
+The PostgreSQL schema currently uses `memory_chunks.embedding vector(1024)`, so BigModel requests send `dimensions: 1024`.
+Embedding vectors are stored and queried as returned by the provider. The project does not normalize vectors in Go because pgvector cosine distance (`<=>`) handles length during similarity calculation.
 
 Then run:
 
@@ -258,7 +271,7 @@ The first version supports stdio MCP servers. Sensitive toolsets should use `req
 - `internal/modelx`: model provider adapters.
 - `internal/observability`: `slog` and OpenTelemetry setup.
 - `internal/rag`: RAG retrieval formatting.
-- `internal/embedding`: hash and Gemini embedding providers.
+- `internal/embedding`: hash, Gemini, and BigModel embedding providers.
 - `internal/store`: PostgreSQL session, memory, summary, hybrid search, and migration code.
 - `internal/store/migrations`: embedded SQL schema.
 

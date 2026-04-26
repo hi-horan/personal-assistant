@@ -29,6 +29,42 @@ glm_thinking_type: enabled
 	}
 }
 
+func TestLoadFileBigModelEmbeddingProvider(t *testing.T) {
+	cfg := loadConfigForTest(t, `
+database_url: "postgres://user:pass@localhost:5432/db?sslmode=disable"
+embedding_provider: bigmodel
+embedding_model: embedding-3
+bigmodel_api_key: "test-key"
+bigmodel_base_url: "https://open.bigmodel.cn/api/paas/v4/"
+`)
+
+	if got, want := cfg.EmbeddingProvider, "bigmodel"; got != want {
+		t.Fatalf("EmbeddingProvider = %q, want %q", got, want)
+	}
+	if got, want := cfg.EmbeddingModel, "embedding-3"; got != want {
+		t.Fatalf("EmbeddingModel = %q, want %q", got, want)
+	}
+	if got, want := cfg.BigModelBaseURL, "https://open.bigmodel.cn/api/paas/v4"; got != want {
+		t.Fatalf("BigModelBaseURL = %q, want %q", got, want)
+	}
+	if got, want := cfg.EmbeddingDimension, 1024; got != want {
+		t.Fatalf("EmbeddingDimension = %d, want %d", got, want)
+	}
+}
+
+func TestLoadFileBigModelEmbeddingProviderRequiresAPIKey(t *testing.T) {
+	path := writeConfigForTest(t, `
+database_url: "postgres://user:pass@localhost:5432/db?sslmode=disable"
+embedding_provider: bigmodel
+embedding_model: embedding-3
+`)
+
+	_, err := LoadFile(path)
+	if err == nil || !strings.Contains(err.Error(), "bigmodel_api_key is required") {
+		t.Fatalf("LoadFile() error = %v, want bigmodel_api_key error", err)
+	}
+}
+
 func TestLoadFileGLMProviderRequiresAPIKey(t *testing.T) {
 	path := writeConfigForTest(t, `
 model_provider: glm
@@ -52,6 +88,19 @@ glm_thinking_type: maybe
 	_, err := LoadFile(path)
 	if err == nil || !strings.Contains(err.Error(), "glm_thinking_type") {
 		t.Fatalf("LoadFile() error = %v, want glm_thinking_type error", err)
+	}
+}
+
+func TestLoadFileRejectsMultipleYAMLDocuments(t *testing.T) {
+	path := writeConfigForTest(t, `
+database_url: "postgres://user:pass@localhost:5432/db?sslmode=disable"
+---
+database_url: "postgres://other:pass@localhost:5432/db?sslmode=disable"
+`)
+
+	_, err := LoadFile(path)
+	if err == nil || !strings.Contains(err.Error(), "multiple YAML documents") {
+		t.Fatalf("LoadFile() error = %v, want multiple YAML documents error", err)
 	}
 }
 
