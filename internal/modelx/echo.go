@@ -9,47 +9,60 @@ import (
 	"google.golang.org/genai"
 )
 
-type EchoModel struct{}
-
-func NewEchoModel() model.LLM {
-	return EchoModel{}
+type EchoModel struct {
+	name string
 }
 
-func (EchoModel) Name() string {
-	return "echo"
+func NewEchoModel(name string) *EchoModel {
+	if name == "" {
+		name = "echo"
+	}
+	return &EchoModel{name: name}
 }
 
-func (EchoModel) GenerateContent(_ context.Context, req *model.LLMRequest, _ bool) iter.Seq2[*model.LLMResponse, error] {
+func (m *EchoModel) Name() string {
+	return m.name
+}
+
+func (m *EchoModel) GenerateContent(ctx context.Context, req *model.LLMRequest, stream bool) iter.Seq2[*model.LLMResponse, error] {
 	return func(yield func(*model.LLMResponse, error) bool) {
-		text := lastUserText(req)
-		if text == "" {
-			text = "No user message was provided."
+		text := latestUserText(req)
+		if strings.TrimSpace(text) == "" {
+			text = "(empty message)"
 		}
-		_ = yield(&model.LLMResponse{
-			Content:      genai.NewContentFromText("echo: "+text, genai.RoleModel),
+		resp := &model.LLMResponse{
+			Content:      genai.NewContentFromText("Echo: "+text, genai.RoleModel),
 			TurnComplete: true,
-			ModelVersion: "echo",
-		}, nil)
+			ModelVersion: m.name,
+		}
+		_ = yield(resp, nil)
 	}
 }
 
-func lastUserText(req *model.LLMRequest) string {
+func latestUserText(req *model.LLMRequest) string {
 	if req == nil {
 		return ""
 	}
 	for i := len(req.Contents) - 1; i >= 0; i-- {
 		content := req.Contents[i]
-		if content == nil || content.Role != genai.RoleUser {
+		if content == nil {
 			continue
 		}
-		parts := make([]string, 0, len(content.Parts))
-		for _, part := range content.Parts {
-			if part != nil && part.Text != "" {
-				parts = append(parts, part.Text)
-			}
+		if content.Role != "" && content.Role != string(genai.RoleUser) {
+			continue
 		}
-		if len(parts) > 0 {
-			return strings.TrimSpace(strings.Join(parts, "\n"))
+		var b strings.Builder
+		for _, part := range content.Parts {
+			if part == nil || part.Text == "" {
+				continue
+			}
+			if b.Len() > 0 {
+				b.WriteString("\n")
+			}
+			b.WriteString(part.Text)
+		}
+		if b.Len() > 0 {
+			return b.String()
 		}
 	}
 	return ""

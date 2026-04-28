@@ -1,133 +1,52 @@
 # AGENTS.md
 
-Project rules for coding agents working in this repository.
+技术栈: golang, paradedb(pgvector, pg_search), adk-go, slog, otel(tempo, prometheus, grafana)
 
-## Scope
+## 目标：实现个人 AI 聊天助手,大量，深度参考 /Users/horan/Desktop/llm/openclaw1/goclaw 项目并进行裁剪，其他多租户等功能全都不要，只保留以下
+1. 所有llm provider
+2. hooks 系统， 7 个生命周期事件（SessionStart、UserPromptSubmit、PreToolUse、PostToolUse、Stop、SubagentStart/Stop）— 同步/异步，防 SSRF HTTP 处理器，审计日志
+3. Audio / TTS 管理器	统一音频管理器，支持 4 个 TTS provider：ElevenLabs（流式）、OpenAI、Edge TTS、MiniMax；语音 LRU 缓存（1 000 租户，TTL 1 小时）
+4. 32 个内置工具	文件系统、网页搜索、浏览器、代码执行、记忆等
+5. 修改部分：有个简单页面，可以多session切换，聊天窗口，展示聊天记录，与web交互还是用 http sse
+6. 三层记忆	L0/L1/L2 配合 consolidation worker（episodic、semantic、dreaming、dedup）
+7. 知识库 Knowledge Vault	Wikilink 文档网格、LLM 自动摘要 + 语义自动链接、BM25 + 向量混合搜索
+8. 知识图谱	基于 LLM 的实体/关系提取，支持图遍历
+9. Agent 进化	Guardrail + suggestion engine；预定义 agent 自我优化 SOUL.md / CAPABILITIES.md 并构建新 skill
+10. Mode Prompt 系统	可切换的 prompt 模式（full / task / minimal / none），支持 per-agent 覆盖
+11. MCP 支持	连接 Model Context Protocol 服务器（stdio/SSE/HTTP）(adk-go自带， 请用adk-go从新实现)
+12. Skills 系统	基于 SKILL.md 的知识库，支持混合搜索；支持发布、授权，以及 evolution 驱动的 skill draft (adk-go自带skills， 请用adk-go从新实现)
+13. Quality Gate	基于 hook 的输出验证，可配置反馈循环
+14. 扩展思考	每个 provider 的推理模式（Anthropic、OpenAI、DashScope）
+15. Prompt 缓存	在重复前缀上最高降低约 90% 成本；v3 cache-boundary marker
+16. 8 阶段 Agent Pipeline	context → history → prompt → think → act → observe → memory → summarize（v3，始终启用）
 
-- This repo is a small personal assistant service.
-- Keep the scope limited to multi-session chat, short-term memory, long-term memory, RAG, MCP, HTTP API, logging, telemetry, and persistence.
-- Do not add UI, auth, billing, schedulers, background job systems, multi-agent orchestration, or unrelated assistant features unless explicitly requested.
+## 修改点
+1. 改成个人应用，多租户，多agent，多用户，全去掉
+2. 命令行解析用 cobra，
+3. agent 框架用 google 的 adk-go, 它里面实现了 mcp，skills，tool，看能不能服用，不用 goclaw自身实现的
+4. 配置从 yaml 文件读取 比如 ./assistant run -c config.yaml
+5. 日志用 slog， 遥测用 otel push
+6. prompt 等能配置等东西全都放到 config文件
+7. 日志要记录 traceid，spanid，与 trace 关联
+8. 日志slog记录参数要用 attrs
+9. 注释用中文，要详略得当，复杂的地方加注释，简单的略掉
+10. 要懂得代码可读性，代码抽象
+11. db 主键用 bigint 后端服务分配id，id为递增微妙时间戳，支持并发
+12. db fts 用 jieba
 
-## Stack
+## 重点：
 
-- Go 1.25+.
-- ADK-Go for agent runtime.
-- PostgreSQL for durable state.
-- ParadeDB pg_search for BM25 and pgvector for memory embedding vector search.
-- Model providers: `echo`, `gemini`, and `glm`.
-- Cobra for CLI commands.
-- YAML for configuration.
-- `log/slog` for logging.
-- OpenTelemetry for tracing and metrics.
+1. 重点关注记忆相关的问题，比如 摘要，压缩，embedding，bm25, 混合搜索，尽量仿照 goclaw ，这是我关注的重点
+2. goclaw 官网 https://docs.goclaw.sh, 数据库 schema: https://docs.goclaw.sh/database-schema
 
-## Commands
 
-- Show make targets: `make help`
-- Create local config: `make config`
-- Start service locally: `make run`
-- Build binary: `make build`
-- Run tests: `make test`
-- Tidy dependencies: `make tidy`
-- Format code: `make fmt`
-- Full local check: `make check`
-- Build Docker image: `make docker-build`
-- Run Docker Compose stack: `make docker-up`
-- Stop Docker Compose stack: `make docker-down`
-- Direct command shape: `go run ./cmd/assistant run -c config.yaml`
-- Binary command shape after `make build`: `./bin/assistant run -c config.yaml`
 
-## Configuration
+## 注意
 
-- Example config lives in `config.example.yaml`.
-- Docker Compose config lives in `config.compose.yaml` and must not contain real secrets.
-- Docker Compose observability config lives in `deploy/`.
-- Docker Compose images should use explicit version tags, not `latest`, `main`, or floating major tags.
-- Local config should be named `config.yaml`; it is ignored by git.
-- Config is loaded only from YAML via `assistant run -c <path>`.
-- `printconfig` defaults to `false`. When enabled, it prints the full effective config without redaction.
-- Keep config validation in `internal/config`.
-- GLM uses the OpenAI-compatible chat completions API with `model_provider: glm`.
-- Use `yaml.Decoder.KnownFields(true)` or equivalent strict decoding for new config fields.
-- Do not reintroduce `.env` as the primary config path.
-
-## Architecture
-
-- `cmd/assistant`: Cobra entrypoint and command wiring.
-- `internal/app`: application orchestration, ADK runner setup, RAG injection, memory tools, MCP toolsets.
-- `internal/config`: YAML config loading and validation.
-- `internal/httpapi`: JSON HTTP API and error mapping.
-- `internal/modelx`: model provider adapters.
-- `internal/observability`: slog and OpenTelemetry setup.
-- `internal/rag`: retrieval and prompt-context formatting.
-- `internal/store`: PostgreSQL session, memory, summary, migration, and ADK service implementations.
-- `internal/store/migrations`: embedded SQL migrations.
-- `docs/ARCHITECTURE.md`: design notes. Update it when behavior or storage shape changes.
-
-## Session And Memory Rules
-
-- `internal/store.Store` implements both ADK `session.Service` and `memory.Service`.
-- IDs for sessions, events, memories, and memory chunks are database `bigint` values allocated by backend `store.IDAllocator` as microsecond timestamp IDs; ADK/API surfaces expose decimal strings.
-- `app_name` is `varchar(256)`, `user_id` is `varchar(50)`, session `title` is `varchar(100)`, memory `kind` is `varchar(20)`, and event `author` is `varchar(50)` in storage. Validate request-owned limits before store calls.
-- Session events are append-only in `session_events`.
-- Persistent session state lives in `sessions.state`.
-- Never persist ADK temporary state keys with prefix `temp:`.
-- Long-term memory lives in `memories` and `memory_chunks`.
-- RAG is hybrid search: ParadeDB BM25 plus pgvector, fused with reciprocal rank fusion.
-- Keep `embedding_dimension` aligned with the `memory_chunks.embedding vector(1024)` schema unless a migration changes both.
-- `embedding_provider: hash` is local and deterministic. `embedding_provider: gemini` and `embedding_provider: bigmodel` are semantic production paths.
-- Keep user/app scoping on every session and memory query.
-
-## MCP Rules
-
-- MCP servers are configured under `mcp.servers` in YAML.
-- Current implementation supports stdio MCP servers through ADK `mcptoolset`.
-- Keep MCP tool confirmation configurable per server.
-- Do not execute MCP tools directly from HTTP handlers; expose them through the ADK agent/toolset path.
-
-## Logging And Telemetry
-
-- Use `slog`; do not introduce another logging framework.
-- Logs should include a relative `source` value in `path/to/file.go:line` form. Do not emit absolute source paths.
-- Request-scoped logs should use `InfoContext`, `ErrorContext`, or equivalent so `trace_id` and `span_id` are recorded.
-- Log startup, config path, migration, HTTP server lifecycle, chat start/end, memory writes/searches, session changes, MCP setup, and shutdown.
-- Avoid logging secrets, API keys, raw credentials, or full config payloads.
-- Use OpenTelemetry spans and metrics around meaningful service, store, RAG, memory, and HTTP work.
-- Compose routes OTLP HTTP to `otel-collector`, Prometheus scrapes collector metrics, Tempo stores traces, and Grafana uses Prometheus plus Tempo datasources.
-- Keep error wrapping specific enough to diagnose the failing operation.
-
-## Error Handling
-
-- Use typed application errors from `internal/apperr` at API/service boundaries.
-- HTTP handlers should return stable JSON errors.
-- Wrap lower-level errors with operation context before returning.
-- Do not panic for normal runtime errors.
-
-## Code Style
-
-- Keep code idiomatic Go.
-- Prefer small packages with explicit dependencies.
-- Keep business logic out of HTTP handlers.
-- Keep SQL in store methods or embedded migrations.
-- Use context-aware calls for I/O.
-- Do not use global mutable state for app dependencies.
-- Add comments only where the logic is not obvious.
-
-## Tests And Validation
-
-- Run `make fmt` after Go edits.
-- Run `make tidy` after dependency or import changes.
-- Run `make test` before handoff.
-- Prefer `make check` when a change touches Go code or dependencies.
-- Add focused tests when changing parsing, error mapping, storage behavior, RAG ranking, or command behavior.
-
-## Docs
-
-- Update `README.md` when commands, configuration, or HTTP API changes.
-- Update `docs/ARCHITECTURE.md` when session, memory, RAG, MCP, telemetry, or storage design changes.
-- Keep markdown examples runnable and aligned with current command names.
-
-## Security
-
-- Do not commit `config.yaml`, secrets, tokens, API keys, database passwords for real environments, or credential files.
-- Keep `gemini_api_key` and MCP server environment values out of logs.
-- Treat MCP tools as potentially sensitive; preserve confirmation support for risky toolsets.
+1. 按照目前golang通常优雅的实现，代码组织结构优化，不是完全照搬 goclaw 实现
+2. 最底层的框架可能不照搬，比如 是否能用 kratos实现 http sse
+3. db的表结构先确定一下，需要我先审核一下，goclaw 表过多，要大幅删减
+4. 当前的代码实现不用考虑太多，推倒重来都是可以的
+5. 日志记录详细，debug级别 重要操作 前后都要记录
+6. 错误处理要充分覆盖
+7. metrics 要详尽

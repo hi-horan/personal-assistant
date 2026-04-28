@@ -6,7 +6,6 @@ providers:
     folder: Personal Assistant
     type: file
     disableDeletion: false
-    editable: true
     updateIntervalSeconds: 30
     options:
       path: /etc/grafana/provisioning/dashboards/json

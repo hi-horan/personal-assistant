@@ -5,45 +5,70 @@ instruction: |
   你是一个简洁、可靠的个人助手。
   请优先使用当前会话历史、会话摘要和长期记忆中与问题相关的信息。
   不要编造记忆；如果记忆缺失或不确定，请基于用户当前消息直接回答。
-  当用户表达稳定偏好、个人资料、长期事实或值得后续使用的信息时，调用 memory_save 保存。
-  如果提供的记忆上下文不足，可以使用 load memory 工具搜索记忆。
 
-  记忆上下文：
-  {rag_context?}
 database_url: "postgres://postgres:postgres@localhost:5432/personal_assistant?sslmode=disable"
 log_level: info
 
-# echo is useful for local wiring tests. Use gemini for real model calls.
 model_provider: echo
+
+providers:
+  echo:
+    type: echo
+    model: echo
+  gemini:
+    type: gemini
+    model: gemini-2.5-flash
+    api_key: ""
+  anthropic:
+    type: anthropic
+    model: claude-sonnet-4-5
+    api_key: ""
+    base_url: "https://api.anthropic.com"
+    reasoning_effort: ""
+  openai:
+    type: openai_compat
+    model: gpt-4o
+    api_key: ""
+    base_url: "https://api.openai.com/v1"
+    reasoning_effort: ""
+  glm:
+    type: openai_compat
+    model: glm-4.6v
+    api_key: ""
+    base_url: "https://open.bigmodel.cn/api/paas/v4"
+    thinking_type: ""
+  dashscope:
+    type: openai_compat
+    model: qwen-plus
+    api_key: ""
+    base_url: "https://dashscope.aliyuncs.com/compatible-mode/v1"
+  deepseek:
+    type: openai_compat
+    model: deepseek-chat
+    api_key: ""
+    base_url: "https://api.deepseek.com/v1"
+  ollama:
+    type: openai_compat
+    model: llama3.1
+    base_url: "http://localhost:11434/v1"
+
+# Legacy fields remain supported for compatibility.
 gemini_model: gemini-2.5-flash
 gemini_api_key: ""
-
 glm_model: glm-4.6v
 glm_api_key: ""
 glm_base_url: "https://open.bigmodel.cn/api/paas/v4"
-# Optional: enabled or disabled. Empty omits the provider-specific thinking field.
 glm_thinking_type: ""
-
 bigmodel_api_key: ""
 bigmodel_base_url: "https://open.bigmodel.cn/api/paas/v4"
 
-# hash is local and deterministic. Use gemini or bigmodel for semantic embeddings in production.
-embedding_provider: bigmodel
-embedding_model: embedding-3
+embedding_provider: hash
+embedding_model: text-embedding-004
 embedding_dimension: 1024
 
-# Optional OpenTelemetry OTLP HTTP endpoint, for example http://localhost:4318
 otel_service_name: personal-assistant
 otel_exporter_otlp_endpoint: ""
 otel_metrics_endpoint: ""
 
 mcp:
   servers: []
-  # - name: filesystem
-  #   command: npx
-  #   args:
-  #     - -y
-  #     - "@modelcontextprotocol/server-filesystem"
-  #     - /tmp
-  #   env: {}
-  #   require_confirmation: true

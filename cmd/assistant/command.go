@@ -1,27 +1,35 @@
 package main
 
 import (
+	"fmt"
+
 	"github.com/spf13/cobra"
 )
 
+const defaultConfigPath = "config.yaml"
+
 func newRootCommand() *cobra.Command {
-	root := &cobra.Command{
+	var configPath string
+
+	cmd := &cobra.Command{
 		Use:           "assistant",
-		Short:         "Personal assistant service",
+		Short:         "Personal AI assistant service",
 		SilenceUsage:  true,
 		SilenceErrors: true,
 	}
 
-	var configPath string
-	runCmd := &cobra.Command{
-		Use:   "run",
-		Short: "Run the HTTP assistant service",
-		RunE: func(cmd *cobra.Command, _ []string) error {
-			return run(cmd.Context(), configPath)
+	cmd.PersistentFlags().StringVarP(&configPath, "config", "c", defaultConfigPath, "path to YAML config file")
+	cmd.AddCommand(newRunCommand(&configPath))
+	cmd.AddCommand(newMigrateCommand(&configPath))
+	cmd.AddCommand(newDoctorCommand(&configPath))
+	cmd.AddCommand(&cobra.Command{
+		Use:   "version",
+		Short: "Print version information",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			_, err := fmt.Fprintln(cmd.OutOrStdout(), "personal-assistant phase0")
+			return err
 		},
-	}
-	runCmd.Flags().StringVarP(&configPath, "config", "c", "config.yaml", "path to YAML config")
+	})
 
-	root.AddCommand(runCmd)
-	return root
+	return cmd
 }
