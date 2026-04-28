@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"sort"
 	"strings"
+	"sync"
 
 	"personal-assistant/internal/embedding"
 
@@ -28,6 +29,8 @@ type Store struct {
 	metrics  storeMetrics
 	embedder embedding.Provider
 	ids      IDAllocator
+	// Maps ADK-provided invocation strings, often UUIDs, to backend bigint IDs.
+	invocations sync.Map
 }
 
 type storeMetrics struct {

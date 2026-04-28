@@ -57,3 +57,15 @@ func parseOptionalID(value, field string) (int64, error) {
 	}
 	return parseID(value, field)
 }
+
+func (s *Store) invocationID(raw string) int64 {
+	if raw == "" {
+		return s.ids.NextID()
+	}
+	if id, err := parseID(raw, "invocation_id"); err == nil {
+		return id
+	}
+	id := s.ids.NextID()
+	actual, _ := s.invocations.LoadOrStore(raw, id)
+	return actual.(int64)
+}

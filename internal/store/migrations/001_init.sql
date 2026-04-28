@@ -5,7 +5,7 @@ CREATE TABLE IF NOT EXISTS sessions (
   id bigint PRIMARY KEY,
   app_name varchar(256) NOT NULL,
   user_id varchar(50) NOT NULL,
-  title text NOT NULL DEFAULT '',
+  title varchar(100) NOT NULL DEFAULT '',
   state jsonb NOT NULL DEFAULT '{}'::jsonb,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now()
@@ -19,8 +19,8 @@ CREATE TABLE IF NOT EXISTS session_events (
   session_id bigint NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
   app_name varchar(256) NOT NULL,
   user_id varchar(50) NOT NULL,
-  invocation_id text NOT NULL DEFAULT '',
-  author text NOT NULL DEFAULT '',
+  invocation_id bigint NOT NULL DEFAULT 0,
+  author varchar(50) NOT NULL DEFAULT '',
   branch text NOT NULL DEFAULT '',
   content_text text NOT NULL DEFAULT '',
   event_json jsonb NOT NULL,
@@ -46,7 +46,7 @@ CREATE TABLE IF NOT EXISTS memories (
   id bigint PRIMARY KEY,
   app_name varchar(256) NOT NULL,
   user_id varchar(50) NOT NULL,
-  kind text NOT NULL DEFAULT 'episodic',
+  kind varchar(20) NOT NULL DEFAULT 'episodic',
   content text NOT NULL,
   metadata jsonb NOT NULL DEFAULT '{}'::jsonb,
   importance double precision NOT NULL DEFAULT 0.5,
@@ -86,7 +86,6 @@ CREATE INDEX IF NOT EXISTS memory_chunks_bm25_idx
   WITH (
     key_field = 'id',
     text_fields = '{
-      "id": {"tokenizer": {"type": "keyword"}},
       "app_name": {"tokenizer": {"type": "keyword"}},
       "user_id": {"tokenizer": {"type": "keyword"}}
     }'

@@ -51,3 +51,26 @@ func TestParseID(t *testing.T) {
 		}
 	}
 }
+
+func TestInvocationID(t *testing.T) {
+	store := &Store{ids: NewMicrosecondIDAllocator()}
+
+	if got := store.invocationID("1700000000000001"); got != 1700000000000001 {
+		t.Fatalf("invocationID(numeric) = %d, want 1700000000000001", got)
+	}
+
+	first := store.invocationID("adk-invocation")
+	second := store.invocationID("adk-invocation")
+	if first == 0 {
+		t.Fatal("invocationID(uuid-like) = 0, want allocated id")
+	}
+	if first != second {
+		t.Fatalf("invocationID reused raw id = %d then %d, want same", first, second)
+	}
+
+	emptyFirst := store.invocationID("")
+	emptySecond := store.invocationID("")
+	if emptyFirst == 0 || emptySecond == 0 || emptyFirst == emptySecond {
+		t.Fatalf("invocationID(empty) = %d then %d, want distinct allocated ids", emptyFirst, emptySecond)
+	}
+}

@@ -16,3 +16,21 @@ func TestValidateScope(t *testing.T) {
 		t.Fatal("validateScope(long user_id) error = nil, want error")
 	}
 }
+
+func TestValidateTitle(t *testing.T) {
+	if err := validateTitle(strings.Repeat("t", 100)); err != nil {
+		t.Fatalf("validateTitle(100) error = %v", err)
+	}
+	if err := validateTitle(strings.Repeat("t", 101)); err == nil {
+		t.Fatal("validateTitle(101) error = nil, want error")
+	}
+}
+
+func TestValidateKind(t *testing.T) {
+	if err := validateKind(strings.Repeat("k", 20)); err != nil {
+		t.Fatalf("validateKind(20) error = %v", err)
+	}
+	if err := validateKind(strings.Repeat("k", 21)); err == nil {
+		t.Fatal("validateKind(21) error = nil, want error")
+	}
+}

@@ -2,6 +2,7 @@ package store
 
 import (
 	"strings"
+	"unicode/utf8"
 
 	"google.golang.org/genai"
 )
@@ -22,4 +23,12 @@ func contentText(content *genai.Content) string {
 
 func compactWhitespace(value string) string {
 	return strings.Join(strings.Fields(value), " ")
+}
+
+func trimRunes(value string, max int) string {
+	if max <= 0 || utf8.RuneCountInString(value) <= max {
+		return value
+	}
+	runes := []rune(value)
+	return string(runes[:max])
 }

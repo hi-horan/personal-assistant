@@ -42,3 +42,12 @@ func TestAppendEventIgnoresPartialEvents(t *testing.T) {
 		t.Fatalf("AppendEvent(partial) error = %v, want nil", err)
 	}
 }
+
+func TestTrimRunes(t *testing.T) {
+	if got := trimRunes("assistant", 50); got != "assistant" {
+		t.Fatalf("trimRunes(short) = %q, want assistant", got)
+	}
+	if got := trimRunes("你好世界", 2); got != "你好" {
+		t.Fatalf("trimRunes(unicode) = %q, want 你好", got)
+	}
+}

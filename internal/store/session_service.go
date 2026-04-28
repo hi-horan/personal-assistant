@@ -198,6 +198,9 @@ func (s *Store) AppendEvent(ctx context.Context, sess session.Session, event *se
 	}
 	eventID := s.ids.NextID()
 	event.ID = formatID(eventID)
+	invocationID := s.invocationID(event.InvocationID)
+	event.InvocationID = formatID(invocationID)
+	event.Author = trimRunes(event.Author, 50)
 	if event.Timestamp.IsZero() {
 		event.Timestamp = time.Now().UTC()
 	}
@@ -245,7 +248,7 @@ func (s *Store) AppendEvent(ctx context.Context, sess session.Session, event *se
 			(id, session_id, app_name, user_id, invocation_id, author, branch, content_text, event_json, created_at)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 		ON CONFLICT (id) DO NOTHING
-	`, eventID, sessionID, sess.AppName(), sess.UserID(), event.InvocationID, event.Author, event.Branch, text, eventJSON, event.Timestamp)
+	`, eventID, sessionID, sess.AppName(), sess.UserID(), invocationID, event.Author, event.Branch, text, eventJSON, event.Timestamp)
 	if err != nil {
 		return fmt.Errorf("insert session event: %w", err)
 	}

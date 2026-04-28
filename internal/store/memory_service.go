@@ -171,7 +171,7 @@ func (s *Store) SaveMemory(ctx context.Context, rec MemoryRecord) (string, error
 	err = tx.QueryRow(ctx, `
 		INSERT INTO memories
 			(id, app_name, user_id, kind, content, metadata, importance, source_session_id, source_event_id, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, NULLIF($8, 0), NULLIF($9, 0), $10, $10)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, NULLIF($8, 0::bigint), NULLIF($9, 0::bigint), $10, $10)
 		ON CONFLICT (source_event_id) WHERE source_event_id IS NOT NULL
 		DO NOTHING
 		RETURNING id

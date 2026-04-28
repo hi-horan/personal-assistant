@@ -35,6 +35,16 @@ The service reads configuration from YAML, runs migrations at startup, and liste
 
 Set `printconfig: true` to print the final effective configuration at startup after defaults, normalization, and derived values are applied. It defaults to `false` and prints full values without redaction.
 
+The root assistant prompt is configured with `instruction`. The default and example config use Chinese:
+
+```yaml
+instruction: |
+  你是一个简洁、可靠的个人助手。
+  请优先使用当前会话历史、会话摘要和长期记忆中与问题相关的信息。
+  记忆上下文：
+  {rag_context?}
+```
+
 Open `http://localhost:8080/` for the built-in web client. It supports selecting a user, creating or loading sessions, sending chat messages, and inspecting the latest RAG/memory details.
 
 For local wiring without a model key, keep `model_provider: echo`. For real calls, update `config.yaml`:

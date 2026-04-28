@@ -67,7 +67,7 @@ Project rules for coding agents working in this repository.
 
 - `internal/store.Store` implements both ADK `session.Service` and `memory.Service`.
 - IDs for sessions, events, memories, and memory chunks are database `bigint` values allocated by backend `store.IDAllocator` as microsecond timestamp IDs; ADK/API surfaces expose decimal strings.
-- `app_name` is `varchar(256)` and `user_id` is `varchar(50)` in storage. Validate those limits before store calls.
+- `app_name` is `varchar(256)`, `user_id` is `varchar(50)`, session `title` is `varchar(100)`, memory `kind` is `varchar(20)`, and event `author` is `varchar(50)` in storage. Validate request-owned limits before store calls.
 - Session events are append-only in `session_events`.
 - Persistent session state lives in `sessions.state`.
 - Never persist ADK temporary state keys with prefix `temp:`.

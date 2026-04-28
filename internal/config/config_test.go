@@ -27,6 +27,34 @@ glm_thinking_type: enabled
 	if got, want := cfg.GLMThinkingType, "enabled"; got != want {
 		t.Fatalf("GLMThinkingType = %q, want %q", got, want)
 	}
+	if !strings.Contains(cfg.Instruction, "个人助手") {
+		t.Fatalf("Instruction = %q, want Chinese default instruction", cfg.Instruction)
+	}
+}
+
+func TestLoadFileInstructionOverride(t *testing.T) {
+	cfg := loadConfigForTest(t, `
+database_url: "postgres://user:pass@localhost:5432/db?sslmode=disable"
+instruction: |
+  你是我的个人助手。
+  {rag_context?}
+`)
+
+	if got, want := cfg.Instruction, "你是我的个人助手。\n{rag_context?}"; got != want {
+		t.Fatalf("Instruction = %q, want %q", got, want)
+	}
+}
+
+func TestLoadFileRejectsEmptyInstruction(t *testing.T) {
+	path := writeConfigForTest(t, `
+database_url: "postgres://user:pass@localhost:5432/db?sslmode=disable"
+instruction: "   "
+`)
+
+	_, err := LoadFile(path)
+	if err == nil || !strings.Contains(err.Error(), "instruction is required") {
+		t.Fatalf("LoadFile() error = %v, want instruction error", err)
+	}
 }
 
 func TestLoadFileBigModelEmbeddingProvider(t *testing.T) {

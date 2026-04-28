@@ -120,7 +120,7 @@ func New(ctx context.Context, cfg config.Config, store *store.Store, logger *slo
 		Name:        "personal_assistant",
 		Description: "A personal assistant with session memory and user-scoped long-term memory.",
 		Model:       llm,
-		Instruction: instruction(),
+		Instruction: cfg.Instruction,
 		Tools:       tools,
 		Toolsets:    toolsets,
 	})
@@ -229,6 +229,7 @@ func (s *Service) Chat(ctx context.Context, req ChatRequest) (ChatResponse, erro
 		status = "session_error"
 		return ChatResponse{}, apperr.Wrap(apperr.CodeInternal, "load session after chat", err)
 	}
+	persistedEvents := sessionView(getResp.Session, true).Events
 	if err := s.store.AddSessionToMemory(ctx, getResp.Session); err != nil {
 		status = "memory_error"
 		return ChatResponse{}, apperr.Wrap(apperr.CodeInternal, "update long-term memory", err)
@@ -244,7 +245,7 @@ func (s *Service) Chat(ctx context.Context, req ChatRequest) (ChatResponse, erro
 	return ChatResponse{
 		SessionID: sessionID,
 		Answer:    answer,
-		Events:    events,
+		Events:    persistedEvents,
 		RAG:       ragResult,
 		Memory:    ragResult.Memories,
 	}, nil
@@ -342,6 +343,7 @@ func (s *Service) ChatStream(ctx context.Context, req ChatRequest, emit func(Cha
 		status = "session_error"
 		return apperr.Wrap(apperr.CodeInternal, "load session after chat", err)
 	}
+	persistedEvents := sessionView(getResp.Session, true).Events
 	if err := s.store.AddSessionToMemory(ctx, getResp.Session); err != nil {
 		status = "memory_error"
 		return apperr.Wrap(apperr.CodeInternal, "update long-term memory", err)
@@ -356,7 +358,7 @@ func (s *Service) ChatStream(ctx context.Context, req ChatRequest, emit func(Cha
 	response := ChatResponse{
 		SessionID: sessionID,
 		Answer:    answer,
-		Events:    events,
+		Events:    persistedEvents,
 		RAG:       ragResult,
 		Memory:    ragResult.Memories,
 	}
@@ -399,6 +401,9 @@ func newServiceMetrics() (serviceMetrics, error) {
 
 func (s *Service) CreateSession(ctx context.Context, req CreateSessionRequest) (SessionView, error) {
 	if err := validateScope(s.cfg.AppName, req.UserID); err != nil {
+		return SessionView{}, err
+	}
+	if err := validateTitle(req.Title); err != nil {
 		return SessionView{}, err
 	}
 	resp, err := s.store.Create(ctx, &session.CreateRequest{
@@ -472,6 +477,9 @@ func (s *Service) SaveMemory(ctx context.Context, rec store.MemoryRecord) (store
 	if err := validateScope(s.cfg.AppName, rec.UserID); err != nil {
 		return store.MemoryResult{}, err
 	}
+	if err := validateKind(rec.Kind); err != nil {
+		return store.MemoryResult{}, err
+	}
 	if rec.Content == "" {
 		return store.MemoryResult{}, apperr.New(apperr.CodeInvalid, "user_id and content are required")
 	}
@@ -529,19 +537,6 @@ func (s *Service) ensureSession(ctx context.Context, userID, sessionID, title st
 		}
 	}
 	return resp.Session.ID(), true, nil
-}
-
-func instruction() string {
-	return strings.TrimSpace(`
-You are a concise personal assistant.
-Use the conversation history, session summary, and long-term memories when they are relevant.
-Do not invent memories. If memory is missing or uncertain, answer from the current user message.
-When the user states a stable preference, profile detail, or durable fact worth remembering, call memory_save.
-You can search memory with the load memory tool if the provided context is insufficient.
-
-Memory context:
-{rag_context?}
-`)
 }
 
 func titleFromMessage(message string) string {

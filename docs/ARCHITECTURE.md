@@ -9,7 +9,7 @@ The service uses ADK-Go as the agent runtime:
 - `runner.Run` owns each chat invocation.
 - `session.Service` is implemented by `internal/store.PostgresSessionService`.
 - `memory.Service` is implemented by `internal/store.PostgresMemoryService`.
-- The root `llmagent` receives a user message, ADK-managed conversation history, RAG context, memory tools, and optional MCP tools.
+- The root `llmagent` receives the YAML-configured `instruction`, a user message, ADK-managed conversation history, RAG context, memory tools, and optional MCP tools.
 - Model providers are selected by YAML: `echo` for local wiring, `gemini` through ADK-Go's Gemini adapter, and `glm` through the OpenAI-compatible GLM chat completions adapter.
 - Embeddings are provided by `internal/embedding`, with local hash embeddings for development and Gemini or BigModel Embedding-3 embeddings for semantic production retrieval.
 
@@ -23,7 +23,7 @@ Sessions are durable PostgreSQL rows:
 - `session_events`: append-only ADK events as JSON plus extracted text for inspection.
 - `session_summaries`: rolling extractive summary for short-term compression.
 
-Session and event IDs are stored as `bigint` microsecond timestamp IDs allocated by the backend. The ADK-facing session and event APIs still expose IDs as decimal strings. The allocator is isolated behind `store.IDAllocator` so it can later be moved behind a distributed ID service. `app_name` is stored as `varchar(256)` and `user_id` as `varchar(50)`.
+Session, event, invocation, memory, and memory chunk IDs are stored as `bigint` microsecond timestamp IDs allocated by the backend. The ADK-facing session and event APIs still expose IDs as decimal strings. The allocator is isolated behind `store.IDAllocator` so it can later be moved behind a distributed ID service. `app_name` is stored as `varchar(256)`, `user_id` as `varchar(50)`, session `title` as `varchar(100)`, event `author` as `varchar(50)`, and memory `kind` as `varchar(20)`.
 
 `PostgresSessionService.AppendEvent` skips ADK partial stream events, persists final/non-partial ADK events, strips `temp:` state keys, applies durable state deltas, and updates the session timestamp.
 

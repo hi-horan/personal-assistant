@@ -1,6 +1,15 @@
 http_addr: ":8080"
 app_name: personal-assistant
 printconfig: false
+instruction: |
+  你是一个简洁、可靠的个人助手。
+  请优先使用当前会话历史、会话摘要和长期记忆中与问题相关的信息。
+  不要编造记忆；如果记忆缺失或不确定，请基于用户当前消息直接回答。
+  当用户表达稳定偏好、个人资料、长期事实或值得后续使用的信息时，调用 memory_save 保存。
+  如果提供的记忆上下文不足，可以使用 load memory 工具搜索记忆。
+
+  记忆上下文：
+  {rag_context?}
 database_url: "postgres://postgres:postgres@postgres:5432/personal_assistant?sslmode=disable"
 log_level: info
 

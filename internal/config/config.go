@@ -15,10 +15,20 @@ import (
 
 const DefaultEmbeddingDimension = 1024
 
+const DefaultInstruction = `你是一个简洁、可靠的个人助手。
+请优先使用当前会话历史、会话摘要和长期记忆中与问题相关的信息。
+不要编造记忆；如果记忆缺失或不确定，请基于用户当前消息直接回答。
+当用户表达稳定偏好、个人资料、长期事实或值得后续使用的信息时，调用 memory_save 保存。
+如果提供的记忆上下文不足，可以使用 load memory 工具搜索记忆。
+
+记忆上下文：
+{rag_context?}`
+
 type Config struct {
 	HTTPAddr            string     `yaml:"http_addr"`
 	AppName             string     `yaml:"app_name"`
 	PrintConfig         bool       `yaml:"printconfig"`
+	Instruction         string     `yaml:"instruction"`
 	DatabaseURL         string     `yaml:"database_url"`
 	LogLevel            slog.Level `yaml:"-"`
 	LogLevelText        string     `yaml:"log_level"`
@@ -63,6 +73,7 @@ func LoadFile(path string) (Config, error) {
 	cfg := Config{
 		HTTPAddr:           ":8080",
 		AppName:            "personal-assistant",
+		Instruction:        DefaultInstruction,
 		LogLevelText:       "info",
 		ModelProvider:      "echo",
 		GeminiModel:        "gemini-2.5-flash",
@@ -89,6 +100,7 @@ func LoadFile(path string) (Config, error) {
 	cfg.EmbeddingProvider = strings.ToLower(strings.TrimSpace(cfg.EmbeddingProvider))
 	cfg.HTTPAddr = strings.TrimSpace(cfg.HTTPAddr)
 	cfg.AppName = strings.TrimSpace(cfg.AppName)
+	cfg.Instruction = strings.TrimSpace(cfg.Instruction)
 	cfg.DatabaseURL = strings.TrimSpace(cfg.DatabaseURL)
 	cfg.GeminiModel = strings.TrimSpace(cfg.GeminiModel)
 	cfg.GeminiAPIKey = strings.TrimSpace(cfg.GeminiAPIKey)
@@ -114,6 +126,9 @@ func LoadFile(path string) (Config, error) {
 	}
 	if utf8.RuneCountInString(cfg.AppName) > 256 {
 		return Config{}, fmt.Errorf("app_name must be at most 256 characters")
+	}
+	if cfg.Instruction == "" {
+		return Config{}, fmt.Errorf("instruction is required")
 	}
 	if cfg.ModelProvider != "echo" && cfg.ModelProvider != "gemini" && cfg.ModelProvider != "glm" {
 		return Config{}, fmt.Errorf("model_provider must be echo, gemini, or glm")
